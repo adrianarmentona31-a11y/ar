@@ -1,7 +1,7 @@
 /* ARMENTA OS — global styles
    Industrial luxury automotive aesthetic. Mobile-first. */
 
-@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Montserrat:wght@400;500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -24,6 +24,15 @@
     --status-active: #22c55e;
     --status-warning: #f59e0b;
     --status-error: #ef4444;
+
+    /* Official brand tier colors (from ARMENTA'S MOTORS brand board) */
+    --tier-gold: #d4a94a;
+    --tier-green: #2f9c4a;
+    --tier-blue: #1e6feb;
+    --tier-blue-deep: #0b3fb0;
+    --tier-standard: var(--tier-gold);
+    --tier-premium: var(--tier-green);
+    --tier-luxury: var(--tier-blue);
 }
 
 * {
@@ -40,10 +49,41 @@ body,
 
 body {
     margin: 0;
-    font-family: 'Inter', system-ui, sans-serif;
+    font-family: 'Montserrat', 'Inter', system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     overflow-x: hidden;
+}
+
+.font-brand {
+    font-family: 'Montserrat', 'Inter', sans-serif;
+    letter-spacing: 0.01em;
+}
+
+/* SERVICIO A DOMICILIO ribbon — mirrors the red banner in the brand board */
+.brand-ribbon {
+    background: linear-gradient(90deg, #7f1d1d 0%, #dc2626 50%, #7f1d1d 100%);
+    color: #fef2f2;
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 700;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    font-size: 11px;
+    padding: 8px 14px;
+    text-align: center;
+    border-radius: 4px;
+    box-shadow: 0 4px 20px -6px rgba(220, 38, 38, 0.45);
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    justify-content: center;
+}
+
+.brand-ribbon::before,
+.brand-ribbon::after {
+    content: "◆";
+    font-size: 8px;
+    color: rgba(255, 255, 255, 0.6);
 }
 
 .font-display {

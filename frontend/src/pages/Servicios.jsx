@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Plus, Trash2, Wrench, Receipt as ReceiptIcon, Upload, Image as ImageIcon, X } from "lucide-react";
+import { Plus, Trash2, Wrench, Receipt as ReceiptIcon, Upload, Image as ImageIcon, X, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import { api, formatApiError } from "../lib/api";
@@ -17,6 +17,8 @@ function ServicePhotos({ serviceId }) {
   const { t } = useI18n();
   const [items, setItems] = useState([]);
   const [uploading, setUploading] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [aiBusy, setAiBusy] = useState(false);
   const inputRef = useRef(null);
 
   const load = useCallback(async () => {
@@ -40,13 +42,23 @@ function ServicePhotos({ serviceId }) {
           params: { service_id: serviceId },
           headers: { "Content-Type": "multipart/form-data" },
         });
-      } catch (err) {
-        toast.error(formatApiError(err));
-      }
+      } catch (err) { toast.error(formatApiError(err)); }
     }
     setUploading(false);
     if (inputRef.current) inputRef.current.value = "";
     load();
+  };
+
+  const generateAI = async () => {
+    if (!aiPrompt.trim()) return toast.error("Escribe un prompt");
+    setAiBusy(true);
+    try {
+      await api.post("/ai/images/generate", { prompt: aiPrompt.trim(), service_id: serviceId });
+      toast.success("Imagen generada");
+      setAiPrompt("");
+      load();
+    } catch (e) { toast.error(formatApiError(e)); }
+    finally { setAiBusy(false); }
   };
 
   const remove = async (id) => {
@@ -62,7 +74,7 @@ function ServicePhotos({ serviceId }) {
     <div className="pt-2 border-t border-[#1a1a1a]">
       <div className="flex items-center justify-between mb-3">
         <label className="text-[11px] uppercase tracking-widest font-mono-tactical text-zinc-500 flex items-center gap-2">
-          <ImageIcon size={13} className="text-[#dc2626]" /> Evidencias
+          <ImageIcon size={13} className="text-[#dc2626]" /> Evidencias · se adjuntan al PDF
         </label>
         <label className="armenta-btn-ghost !h-9 !px-3 flex items-center gap-2 cursor-pointer" data-testid="photos-upload-btn">
           <Upload size={13} />
@@ -70,6 +82,25 @@ function ServicePhotos({ serviceId }) {
           <input ref={inputRef} type="file" accept="image/*,application/pdf" multiple className="hidden" onChange={onFiles} data-testid="photos-input" />
         </label>
       </div>
+
+      {/* AI image generation */}
+      <div className="flex gap-2 mb-3">
+        <input
+          type="text"
+          className="flex-1 h-10 bg-[#0d0d0d] border border-[#262626] rounded-lg px-3 text-sm text-white outline-none focus:border-[#dc2626]"
+          placeholder='Generar con IA (ej. "van Armenta llegando al domicilio al atardecer")'
+          value={aiPrompt}
+          onChange={(e) => setAiPrompt(e.target.value)}
+          data-testid="ai-prompt-input"
+        />
+        <button type="button" onClick={generateAI} disabled={aiBusy}
+          className="h-10 px-4 rounded-lg border border-[#dc262666] bg-[#dc262614] text-[#dc2626] hover:bg-[#dc262622] flex items-center gap-2 text-xs font-semibold uppercase tracking-widest"
+          data-testid="ai-generate-btn">
+          {aiBusy ? <span className="spinner spinner-gold" /> : <Zap size={13} />}
+          {aiBusy ? "Generando…" : "IA"}
+        </button>
+      </div>
+
       {items.length === 0 ? (
         <div className="text-xs text-zinc-600 py-3 text-center border border-dashed border-[#262626] rounded-lg">
           Sin fotos de evidencia todavía
@@ -83,6 +114,9 @@ function ServicePhotos({ serviceId }) {
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-xs text-zinc-500 p-2 text-center">{f.original_filename}</div>
               )}
+              {f.ai_generated && (
+                <span className="absolute top-1 left-1 bg-[#dc2626] text-white text-[8px] uppercase tracking-widest font-mono-tactical px-1.5 py-0.5 rounded">IA</span>
+              )}
               <button type="button" onClick={() => remove(f.id)} className="absolute top-1 right-1 bg-black/70 hover:bg-red-900 text-white rounded p-1 opacity-0 group-hover:opacity-100 transition-opacity" data-testid={`photo-rm-${f.id}`}>
                 <X size={12} />
               </button>
@@ -90,6 +124,68 @@ function ServicePhotos({ serviceId }) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function TuneupPresetPicker({ onApply }) {
+  const [catalog, setCatalog] = useState(null);
+  const [tier, setTier] = useState("estandar");
+  const [cyl, setCyl] = useState(4);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    api.get("/catalog/tuneups").then((r) => setCatalog(r.data)).catch(() => {});
+  }, []);
+
+  if (!catalog) return null;
+  const t = catalog.tiers.find((x) => x.key === tier);
+
+  const apply = async () => {
+    setBusy(true);
+    try {
+      const { data } = await api.post("/catalog/tuneups/preset-items", { tier, cylinders: cyl });
+      onApply(data.items);
+      toast.success(`Preset ${data.tier_label} · ${data.cylinders} cil aplicado`);
+    } catch (e) { toast.error(formatApiError(e)); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <div className="pt-2 border-t border-[#1a1a1a]">
+      <div className="flex items-center gap-2 mb-3">
+        <Zap size={14} className="text-[#dc2626]" />
+        <span className="text-[11px] uppercase tracking-widest font-mono-tactical text-zinc-400">Preset de afinación oficial</span>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+        <div className="sm:col-span-2 grid grid-cols-3 gap-1">
+          {catalog.tiers.map((it) => (
+            <button key={it.key} type="button" onClick={() => setTier(it.key)}
+              data-testid={`preset-tier-${it.key}`}
+              className={`h-11 rounded-lg border text-[10px] uppercase font-mono-tactical tracking-widest transition-colors ${tier === it.key ? "text-white" : "text-zinc-500 hover:text-white"}`}
+              style={{ borderColor: tier === it.key ? it.color : "#262626", background: tier === it.key ? `${it.color}22` : "#0d0d0d" }}
+            >
+              {it.label.replace("Calidad ", "")}
+            </button>
+          ))}
+        </div>
+        <div className="grid grid-cols-3 gap-1">
+          {catalog.cylinders.map((n) => (
+            <button key={n} type="button" onClick={() => setCyl(n)}
+              data-testid={`preset-cyl-${n}`}
+              className={`h-11 rounded-lg border text-xs font-mono-tactical ${cyl === n ? "border-[#dc2626] bg-[#dc262614] text-white" : "border-[#262626] bg-[#0d0d0d] text-zinc-500 hover:text-white"}`}
+            >{n} CIL</button>
+          ))}
+        </div>
+        <button type="button" onClick={apply} disabled={busy} data-testid="preset-apply"
+          className="h-11 px-4 rounded-lg border border-[#dc262666] bg-[#dc262614] text-[#dc2626] hover:bg-[#dc262622] flex items-center justify-center gap-2 text-xs font-semibold uppercase tracking-widest">
+          {busy ? <span className="spinner spinner-gold" /> : <Zap size={13} />}
+          Aplicar · ${t.prices[cyl].toLocaleString()} MXN
+        </button>
+      </div>
+      <div className="text-[10px] font-mono-tactical uppercase tracking-widest text-zinc-600 mt-2">
+        Bujías {t.spark_plug.material} · Aceite {t.spark_plug.oil} · {t.includes.slice(0, 3).join(" · ")}
+      </div>
     </div>
   );
 }
@@ -221,6 +317,7 @@ function ServiceForm({ initial, clients, vehicles, technicians, onClose, onSaved
         <div className="pt-2 border-t border-[#1a1a1a]">
           <ItemsEditor items={items} setItems={setItems} taxRate={taxRate} setTaxRate={setTaxRate} />
         </div>
+        <TuneupPresetPicker onApply={(preset) => setItems([...(items || []), ...preset])} />
         {editing && <ServicePhotos serviceId={initial.id} />}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Field label={t.servicios.form.recommendations}><Textarea testId="service-reco" value={f.recommendations} onChange={set("recommendations")} rows={2} /></Field>

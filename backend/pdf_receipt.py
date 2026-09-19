@@ -78,8 +78,11 @@ def _draw_wordmark(c: canvas.Canvas, x: float, y: float, width: float = 62 * mm)
         c.drawString(x, y - 8 * mm, "ARMENTA'S MOTORS")
 
 
-def build_receipt_pdf(doc: dict, settings: dict, kind: str = "servicio") -> bytes:
-    """Render receipt PDF and return bytes."""
+def build_receipt_pdf(doc: dict, settings: dict, kind: str = "servicio", photos: Optional[list] = None) -> bytes:
+    """Render receipt PDF and return bytes.
+
+    photos: optional list of {"bytes": <png/jpg bytes>, "caption": str} to be
+    appended as evidence annex pages (2x2 grid per page)."""
     buf = BytesIO()
     c = canvas.Canvas(buf, pagesize=LETTER)
     page_w, page_h = LETTER
@@ -329,6 +332,72 @@ def build_receipt_pdf(doc: dict, settings: dict, kind: str = "servicio") -> byte
         c.drawCentredString(page_w / 2, 18 * mm - i * 3.2 * mm, line)
 
     c.showPage()
+
+    # ------------------- Evidence annex (photos) -------------------
+    if photos:
+        page_w, page_h = LETTER
+        margin_x = 18 * mm
+        page_num = 0
+        for i in range(0, len(photos), 4):
+            page_num += 1
+            batch = photos[i:i + 4]
+            # Header
+            c.setFillColor(INK)
+            c.setFont("Helvetica-Bold", 14)
+            c.drawString(margin_x, page_h - 20 * mm, "EVIDENCIAS DEL SERVICIO")
+            c.setFillColor(MUTED)
+            c.setFont("Helvetica", 8)
+            c.drawString(margin_x, page_h - 26 * mm,
+                         f"Folio {doc.get('folio', '')}  ·  Página {page_num} de {(len(photos) + 3) // 4}")
+            c.setStrokeColor(RED)
+            c.setLineWidth(1.2)
+            c.line(margin_x, page_h - 29 * mm, page_w - margin_x, page_h - 29 * mm)
+
+            # 2x2 grid
+            cell_w = (page_w - 2 * margin_x - 6 * mm) / 2
+            cell_h = (page_h - 60 * mm - 6 * mm) / 2
+            grid_top = page_h - 34 * mm
+            for j, photo in enumerate(batch):
+                col = j % 2
+                row = j // 2
+                cx = margin_x + col * (cell_w + 6 * mm)
+                cy = grid_top - (row + 1) * cell_h - row * 6 * mm
+                c.setStrokeColor(RULE)
+                c.setLineWidth(0.6)
+                c.roundRect(cx, cy, cell_w, cell_h, 2 * mm, stroke=1, fill=0)
+                try:
+                    img = ImageReader(BytesIO(photo["bytes"]))
+                    iw, ih = img.getSize()
+                    # Fit inside cell keeping aspect
+                    pad = 3 * mm
+                    fit_w = cell_w - 2 * pad
+                    fit_h = cell_h - 10 * mm  # leave room for caption
+                    scale = min(fit_w / iw, fit_h / ih)
+                    draw_w = iw * scale
+                    draw_h = ih * scale
+                    dx = cx + (cell_w - draw_w) / 2
+                    dy = cy + cell_h - 7 * mm - draw_h
+                    c.drawImage(img, dx, dy, width=draw_w, height=draw_h, mask="auto")
+                except Exception:
+                    c.setFillColor(LIGHT)
+                    c.setFont("Helvetica-Oblique", 8)
+                    c.drawCentredString(cx + cell_w / 2, cy + cell_h / 2, "Imagen no disponible")
+                # Caption
+                caption = str(photo.get("caption") or "")[:80]
+                if caption:
+                    c.setFillColor(INK_SOFT)
+                    c.setFont("Helvetica", 7)
+                    c.drawString(cx + 3 * mm, cy + 4 * mm, caption)
+
+            # Footer
+            c.setStrokeColor(RULE)
+            c.line(margin_x, 22 * mm, page_w - margin_x, 22 * mm)
+            c.setFillColor(MUTED)
+            c.setFont("Helvetica", 7)
+            footer_note = settings.get("footer_note") or "Armenta's Motors Company"
+            c.drawCentredString(page_w / 2, 18 * mm, footer_note)
+            c.showPage()
+
     c.save()
     return buf.getvalue()
 

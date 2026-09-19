@@ -1301,6 +1301,175 @@ async def health():
 
 
 # ---------------------------------------------------------------------------
+# CATÁLOGO OFICIAL DE AFINACIÓN (ARMENTA'S MOTORS brand board)
+# Sistema de Afinación Multi-Cilindro · precios en MXN
+# ---------------------------------------------------------------------------
+TUNEUP_CATALOG = {
+    "currency": "MXN",
+    "tagline": "SERVICIO A DOMICILIO",
+    "tiers": [
+        {
+            "key": "estandar",
+            "label": "Calidad Estándar",
+            "color": "#d4a94a",
+            "spark_plug": {"material": "Cobre", "oil": "Mineral"},
+            "prices": {"4": 2500, "6": 3200, "8": 3700},
+            "includes": [
+                "Cambio de aceite",
+                "Verificación de niveles",
+                "Filtro de gasolina",
+                "Limpieza de gasolina",
+                "Limpieza de cuerpo de aceleración",
+            ],
+        },
+        {
+            "key": "premium",
+            "label": "Calidad Premium",
+            "color": "#2f9c4a",
+            "spark_plug": {"material": "Platino", "oil": "Semi-sintético"},
+            "prices": {"4": 3300, "6": 4000, "8": 4400},
+            "includes": [
+                "Todo lo Estándar",
+                "Limpieza de bornas",
+                "Escaneo por computadora",
+                "Limpieza válvulas IAC y PVC",
+                "Limpieza de inyectores",
+            ],
+        },
+        {
+            "key": "lujo",
+            "label": "Calidad de Lujo",
+            "color": "#1e6feb",
+            "spark_plug": {"material": "Iridium", "oil": "Sintético"},
+            "prices": {"4": 3900, "6": 4700, "8": 5400},
+            "includes": [
+                "Todo lo Premium",
+                "Verificación de sistema de aceleración",
+                "Revisión cuerpo, motor / transmisión",
+                "Verificación de suspensión y frenos",
+                "Limpieza total con aditivos premium",
+            ],
+        },
+    ],
+    "cylinders": [4, 6, 8],
+    "spark_plug_options": [
+        {"key": "cobre", "label": "Cobre", "family": "Mineral"},
+        {"key": "platino", "label": "Platino", "family": "Semi-sintético"},
+        {"key": "iridium", "label": "Iridium", "family": "Sintético"},
+    ],
+}
+
+
+@api.get("/catalog/tuneups")
+async def catalog_tuneups(user: dict = Depends(get_current_user)):
+    return TUNEUP_CATALOG
+
+
+class TuneupPresetItems(BaseModel):
+    tier: Literal["estandar", "premium", "lujo"]
+    cylinders: Literal[4, 6, 8]
+
+
+@api.post("/catalog/tuneups/preset-items")
+async def tuneup_preset_items(body: TuneupPresetItems, user: dict = Depends(get_current_user)):
+    """Return QuoteItem[] ready to be dropped into a Service or Quote form."""
+    tier = next((t for t in TUNEUP_CATALOG["tiers"] if t["key"] == body.tier), None)
+    if not tier:
+        raise HTTPException(400, "Nivel no válido")
+    price = tier["prices"].get(str(body.cylinders))
+    if price is None:
+        raise HTTPException(400, "Cilindrada no válida")
+    label = f"Afinación {tier['label']} · {body.cylinders} cilindros · bujías {tier['spark_plug']['material']}"
+    return {
+        "tier": tier["key"],
+        "tier_label": tier["label"],
+        "cylinders": body.cylinders,
+        "items": [
+            {
+                "description": label + " · " + ", ".join(tier["includes"][:3]),
+                "quantity": 1,
+                "unit_price": price,
+                "cost": round(price * 0.55, 2),  # margen sugerido ~45% (referencia interna)
+                "is_labor": False,
+            }
+        ],
+    }
+
+
+# ---------------------------------------------------------------------------
+# AI IMAGE GENERATION (Gemini Nano Banana via Emergent LLM key)
+# ---------------------------------------------------------------------------
+import base64 as _base64  # noqa: E402
+from emergentintegrations.llm.chat import LlmChat, UserMessage  # noqa: E402
+
+
+class ImageGenRequest(BaseModel):
+    prompt: str = Field(..., min_length=3, max_length=800)
+    model: str = "gemini-3.1-flash-image-preview"
+    service_id: Optional[str] = None
+
+
+@api.post("/ai/images/generate")
+async def ai_generate_image(body: ImageGenRequest, user: dict = Depends(get_current_user)):
+    api_key = os.environ.get("EMERGENT_LLM_KEY", "").strip()
+    if not api_key:
+        raise HTTPException(status_code=500, detail="EMERGENT_LLM_KEY no configurado")
+    session_id = f"armentaos-{user['id']}-{uuid.uuid4().hex[:8]}"
+    chat = LlmChat(api_key=api_key, session_id=session_id, system_message="You are a professional automotive service designer.")
+    try:
+        chat.with_model("gemini", body.model).with_params(modalities=["image", "text"])
+        msg = UserMessage(text=body.prompt)
+        text, images = await chat.send_message_multimodal_response(msg)
+    except Exception as exc:
+        logger.exception("gemini image gen failed: %s", exc)
+        raise HTTPException(status_code=502, detail=f"Generación falló: {exc}")
+
+    if not images:
+        raise HTTPException(status_code=502, detail="El modelo no devolvió imagen")
+
+    first = images[0]
+    mime = first.get("mime_type") or "image/png"
+    ext = "png" if "png" in mime else "jpg" if "jpeg" in mime or "jpg" in mime else "png"
+    image_bytes = _base64.b64decode(first["data"])
+    file_id = str(uuid.uuid4())
+    path = f"armenta-os/ai/{user['id']}/{file_id}.{ext}"
+    try:
+        result = put_object(path, image_bytes, mime)
+    except Exception as exc:
+        logger.exception("storage put failed: %s", exc)
+        raise HTTPException(status_code=502, detail="No se pudo guardar la imagen generada")
+
+    doc = {
+        "id": file_id,
+        "storage_path": result["path"],
+        "original_filename": f"ai-{file_id}.{ext}",
+        "content_type": mime,
+        "size": result.get("size", len(image_bytes)),
+        "service_id": body.service_id,
+        "uploaded_by": user["id"],
+        "is_deleted": False,
+        "ai_generated": True,
+        "ai_prompt": body.prompt,
+        "ai_model": body.model,
+        "created_at": now_iso(),
+    }
+    await db.files.insert_one(doc)
+    if body.service_id:
+        await db.services.update_one(
+            {"id": body.service_id},
+            {"$addToSet": {"photos": file_id}, "$set": {"updated_at": now_iso()}},
+        )
+    return {
+        "id": file_id,
+        "storage_path": doc["storage_path"],
+        "content_type": mime,
+        "size": doc["size"],
+        "prompt": body.prompt,
+        "text_response": text or "",
+    }
+
+
+# ---------------------------------------------------------------------------
 # RECIBOS EN PDF
 # ---------------------------------------------------------------------------
 async def _load_settings_dict() -> dict:
@@ -1329,7 +1498,12 @@ async def _enrich_doc(kind: str, doc: dict) -> dict:
 
 
 @api.get("/receipts/{kind}/{doc_id}/pdf")
-async def receipt_pdf(kind: str, doc_id: str, user: dict = Depends(get_current_user)):
+async def receipt_pdf(
+    kind: str,
+    doc_id: str,
+    include_photos: bool = Query(True, description="Adjuntar evidencias como anexo"),
+    user: dict = Depends(get_current_user),
+):
     if kind not in ("servicio", "cotizacion"):
         raise HTTPException(status_code=400, detail="Tipo inválido")
     coll = db.services if kind == "servicio" else db.quotes
@@ -1338,7 +1512,28 @@ async def receipt_pdf(kind: str, doc_id: str, user: dict = Depends(get_current_u
         raise HTTPException(status_code=404, detail="Documento no encontrado")
     enriched = await _enrich_doc(kind, doc)
     settings = await _load_settings_dict()
-    pdf_bytes = build_receipt_pdf(enriched, settings, kind=kind)
+
+    photos_payload = None
+    if kind == "servicio" and include_photos:
+        photos_payload = []
+        file_docs = await db.files.find(
+            {"service_id": doc_id, "is_deleted": False},
+            {"_id": 0},
+        ).sort("created_at", 1).to_list(24)
+        for f in file_docs:
+            if not (f.get("content_type") or "").startswith("image/"):
+                continue
+            try:
+                data, _ct = get_object(f["storage_path"])
+                photos_payload.append({
+                    "bytes": data,
+                    "caption": f.get("original_filename", ""),
+                })
+            except Exception as exc:
+                logger.warning("Photo fetch failed for %s: %s", f.get("id"), exc)
+        photos_payload = photos_payload or None
+
+    pdf_bytes = build_receipt_pdf(enriched, settings, kind=kind, photos=photos_payload)
     filename = f"{enriched.get('folio', 'recibo')}.pdf"
     return Response(
         content=pdf_bytes,
