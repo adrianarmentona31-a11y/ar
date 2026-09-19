@@ -1,17 +1,19 @@
 import React, { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   Wrench,
   FileText,
   DollarSign,
   ShieldCheck,
-  PlusCircle,
+  ArrowUpRight,
   Car,
+  Users,
   Clock,
 } from "lucide-react";
-import { toast } from "sonner";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../context/I18nContext";
 import { api } from "../lib/api";
+import { fmtMoney } from "../lib/format";
 
 function KpiCard({ testId, icon: Icon, title, value, subtitle, badge, tone = "gold" }) {
   const toneStyle =
@@ -42,11 +44,10 @@ function KpiCard({ testId, icon: Icon, title, value, subtitle, badge, tone = "go
   );
 }
 
-function QuickAction({ testId, icon: Icon, label, soonLabel, onClick }) {
+function QuickAction({ testId, icon: Icon, label, sublabel, to }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
+    <Link
+      to={to}
       data-testid={testId}
       className="card-tactical p-4 flex items-center gap-3 text-left w-full hover:border-[#dc262666]"
     >
@@ -55,12 +56,12 @@ function QuickAction({ testId, icon: Icon, label, soonLabel, onClick }) {
       </div>
       <div className="flex-1 min-w-0">
         <div className="text-sm font-medium text-white truncate">{label}</div>
-        <div className="text-[10px] uppercase tracking-widest font-mono-tactical text-zinc-500">
-          {soonLabel}
+        <div className="text-[10px] uppercase tracking-widest font-mono-tactical text-zinc-500 truncate">
+          {sublabel}
         </div>
       </div>
-      <PlusCircle size={16} className="text-zinc-600" />
-    </button>
+      <ArrowUpRight size={16} className="text-zinc-600" />
+    </Link>
   );
 }
 
@@ -84,7 +85,7 @@ export default function Dashboard() {
     };
   }, []);
 
-  const notifySoon = () => toast(t.toast.soon);
+  const notifySoon = null;
 
   return (
     <div className="space-y-6" data-testid="dashboard-page">
@@ -157,31 +158,28 @@ export default function Dashboard() {
             <h2 className="font-display uppercase text-lg tracking-wider text-white">
               {t.dashboard.quick_actions.title}
             </h2>
-            <span className="text-[10px] uppercase font-mono-tactical tracking-widest text-zinc-500">
-              {t.dashboard.quick_actions.soon}
-            </span>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <QuickAction
               testId="action-btn-nuevo-servicio"
               icon={Wrench}
               label={t.dashboard.quick_actions.new_service}
-              soonLabel={t.dashboard.quick_actions.soon}
-              onClick={notifySoon}
+              sublabel={t.servicios.title}
+              to="/servicios"
             />
             <QuickAction
               testId="action-btn-nuevo-vehiculo"
               icon={Car}
               label={t.dashboard.quick_actions.new_vehicle}
-              soonLabel={t.dashboard.quick_actions.soon}
-              onClick={notifySoon}
+              sublabel={t.vehiculos.title}
+              to="/vehiculos"
             />
             <QuickAction
               testId="action-btn-nueva-cotizacion"
               icon={FileText}
               label={t.dashboard.quick_actions.new_quote}
-              soonLabel={t.dashboard.quick_actions.soon}
-              onClick={notifySoon}
+              sublabel={t.cotizaciones.title}
+              to="/cotizaciones"
             />
           </div>
         </section>
