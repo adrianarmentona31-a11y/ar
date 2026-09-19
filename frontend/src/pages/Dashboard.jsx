@@ -19,13 +19,13 @@ function KpiCard({ testId, icon: Icon, title, value, subtitle, badge, tone = "go
       ? "text-emerald-400 border-emerald-800/50 bg-emerald-950/30"
       : tone === "amber"
         ? "text-amber-300 border-amber-800/50 bg-amber-950/30"
-        : "text-[#c9a45c] border-[#c9a45c40] bg-[#c9a45c14]";
+        : "text-[#dc2626] border-[#dc262640] bg-[#dc262614]";
 
   return (
     <div className="card-tactical p-4 sm:p-5" data-testid={testId}>
       <div className="flex items-start justify-between mb-3">
         <div className="w-10 h-10 rounded-lg bg-[#0d0d0d] border border-[#262626] flex items-center justify-center">
-          <Icon size={18} className="text-[#c9a45c]" />
+          <Icon size={18} className="text-[#dc2626]" />
         </div>
         <span
           className={`text-[9px] font-mono-tactical uppercase tracking-widest px-2 py-1 rounded border ${toneStyle}`}
@@ -48,10 +48,10 @@ function QuickAction({ testId, icon: Icon, label, soonLabel, onClick }) {
       type="button"
       onClick={onClick}
       data-testid={testId}
-      className="card-tactical p-4 flex items-center gap-3 text-left w-full hover:border-[#c9a45c66]"
+      className="card-tactical p-4 flex items-center gap-3 text-left w-full hover:border-[#dc262666]"
     >
       <div className="w-10 h-10 rounded-lg bg-[#0d0d0d] border border-[#262626] flex items-center justify-center">
-        <Icon size={18} className="text-[#c9a45c]" />
+        <Icon size={18} className="text-[#dc2626]" />
       </div>
       <div className="flex-1 min-w-0">
         <div className="text-sm font-medium text-white truncate">{label}</div>
@@ -188,7 +188,7 @@ export default function Dashboard() {
 
         <section className="card-tactical p-5" data-testid="recent-activity-panel">
           <div className="flex items-center gap-2 mb-3">
-            <Clock size={16} className="text-[#c9a45c]" />
+            <Clock size={16} className="text-[#dc2626]" />
             <h2 className="font-display uppercase text-lg tracking-wider text-white">
               {t.dashboard.activity.title}
             </h2>

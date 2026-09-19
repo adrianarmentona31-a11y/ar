@@ -21,7 +21,7 @@ export default function ModulePlaceholder({ moduleKeyOverride }) {
           </h1>
         </div>
         <span
-          className="inline-flex items-center gap-2 px-3 h-9 rounded-full border border-[#c9a45c66] bg-[#c9a45c14] text-[10px] font-mono-tactical uppercase tracking-widest text-[#c9a45c]"
+          className="inline-flex items-center gap-2 px-3 h-9 rounded-full border border-[#dc262666] bg-[#dc262614] text-[10px] font-mono-tactical uppercase tracking-widest text-[#dc2626]"
           data-testid="module-proximamente-banner"
         >
           <Construction size={12} />

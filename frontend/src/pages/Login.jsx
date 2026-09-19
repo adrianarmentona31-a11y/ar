@@ -4,6 +4,7 @@ import { Eye, EyeOff, User, Lock, Globe, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../context/I18nContext";
+import { BrandMark, BrandWordmark } from "../components/BrandMark";
 
 export default function Login() {
   const { login, isAuthenticated, isInitializing } = useAuth();
@@ -59,16 +60,12 @@ export default function Login() {
 
         <div className="w-full max-w-md">
           <div className="flex flex-col items-center mb-8">
-            <div className="w-16 h-16 rounded-2xl bg-[#101010] border border-[#c9a45c66] flex items-center justify-center gold-glow mb-4">
-              <span className="font-display font-extrabold text-2xl text-[#c9a45c]">
-                A
-              </span>
-            </div>
+            <BrandMark size={72} glow className="mb-4" />
             <span className="font-mono-tactical text-[10px] uppercase tracking-[0.28em] text-zinc-500">
               {t.brand.company}
             </span>
-            <h1 className="font-display uppercase text-3xl sm:text-4xl font-extrabold tracking-tight text-white mt-1">
-              ARMENTA <span className="text-[#c9a45c]">OS</span>
+            <h1 className="text-3xl sm:text-4xl mt-1">
+              <BrandWordmark className="text-white" />
             </h1>
             <p className="text-xs text-zinc-500 mt-2 font-mono-tactical tracking-wider uppercase">
               {t.brand.tagline}
@@ -169,7 +166,7 @@ export default function Login() {
             </form>
 
             <div className="mt-6 pt-4 border-t border-[#1a1a1a] flex items-center gap-2 text-[11px] font-mono-tactical uppercase tracking-widest text-zinc-500">
-              <ShieldCheck size={13} className="text-[#c9a45c]" />
+              <ShieldCheck size={13} className="text-[#dc2626]" />
               <span>{t.login.footer}</span>
             </div>
           </div>

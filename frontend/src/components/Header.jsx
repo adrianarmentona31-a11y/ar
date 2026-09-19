@@ -3,6 +3,7 @@ import { LogOut, Globe } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../context/I18nContext";
 import { toast } from "sonner";
+import { BrandMark } from "./BrandMark";
 
 export function Header() {
   const { user, logout } = useAuth();
@@ -29,12 +30,10 @@ export function Header() {
     >
       <div className="max-w-7xl mx-auto flex items-center justify-between px-4 sm:px-6 h-16">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-md bg-[#101010] border border-[#c9a45c66] flex items-center justify-center">
-            <span className="font-display font-bold text-[15px] text-[#c9a45c]">A</span>
-          </div>
+          <BrandMark size={36} />
           <div className="flex flex-col leading-tight">
             <span className="font-display uppercase text-[15px] tracking-wider text-white">
-              ARMENTA OS
+              ARMENTA <span className="text-[#dc2626]">OS</span>
             </span>
             <span className="hidden sm:inline text-[10px] font-mono-tactical uppercase tracking-widest text-zinc-500">
               {t.brand.company}
@@ -68,7 +67,7 @@ export function Header() {
             className="hidden md:flex items-center gap-2 px-3 h-9 rounded-md border border-[#262626] bg-[#0d0d0d]"
             data-testid="header-user-badge"
           >
-            <div className="w-6 h-6 rounded-full bg-[#c9a45c] text-black text-[11px] font-bold flex items-center justify-center font-display">
+            <div className="w-6 h-6 rounded-full bg-[#dc2626] text-white text-[11px] font-bold flex items-center justify-center font-display">
               {initials}
             </div>
             <div className="flex flex-col leading-tight">

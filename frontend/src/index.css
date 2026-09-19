@@ -12,10 +12,12 @@
     --bg-card: #101010;
     --bg-elevated: #161616;
     --border-subtle: #262626;
-    --border-gold: rgba(201, 164, 92, 0.35);
-    --gold: #c9a45c;
-    --gold-hover: #d9b46a;
-    --gold-glow: rgba(201, 164, 92, 0.18);
+    --border-gold: rgba(220, 38, 38, 0.4);
+    --gold: #dc2626;
+    --gold-hover: #ef4444;
+    --gold-glow: rgba(220, 38, 38, 0.28);
+    --silver: #e5e7eb;
+    --silver-muted: #a1a1aa;
     --text-primary: #ffffff;
     --text-secondary: #a1a1aa;
     --text-muted: #71717a;
@@ -58,13 +60,13 @@ body {
     background-color: var(--bg-root);
     background-image:
         radial-gradient(
-            circle at 20% 10%,
-            rgba(201, 164, 92, 0.06) 0%,
+            circle at 15% 8%,
+            rgba(220, 38, 38, 0.09) 0%,
             transparent 40%
         ),
         radial-gradient(
-            circle at 80% 90%,
-            rgba(201, 164, 92, 0.04) 0%,
+            circle at 85% 92%,
+            rgba(220, 38, 38, 0.06) 0%,
             transparent 45%
         ),
         linear-gradient(
@@ -92,8 +94,8 @@ body {
 
 .gold-glow {
     box-shadow:
-        0 0 0 1px rgba(201, 164, 92, 0.25),
-        0 8px 30px -8px rgba(201, 164, 92, 0.25);
+        0 0 0 1px rgba(220, 38, 38, 0.3),
+        0 10px 34px -8px rgba(220, 38, 38, 0.35);
 }
 
 .pulse-dot {
@@ -145,7 +147,7 @@ body {
     height: 56px;
     border-radius: 10px;
     background: var(--gold);
-    color: #0a0a0a;
+    color: #ffffff;
     font-weight: 700;
     letter-spacing: 0.08em;
     text-transform: uppercase;
@@ -194,14 +196,14 @@ body {
     width: 18px;
     height: 18px;
     border-radius: 50%;
-    border: 2px solid rgba(10, 10, 10, 0.25);
-    border-top-color: #0a0a0a;
+    border: 2px solid rgba(255, 255, 255, 0.35);
+    border-top-color: #ffffff;
     animation: spin 0.7s linear infinite;
     display: inline-block;
 }
 
 .spinner-gold {
-    border: 2px solid rgba(201, 164, 92, 0.2);
+    border: 2px solid rgba(220, 38, 38, 0.25);
     border-top-color: var(--gold);
 }
 
@@ -230,7 +232,7 @@ body {
 
 .bottom-nav-item.active {
     color: var(--gold);
-    background: rgba(201, 164, 92, 0.08);
+    background: rgba(220, 38, 38, 0.12);
 }
 
 .bottom-nav-item:hover {
@@ -258,7 +260,7 @@ body {
 }
 
 .sidebar-item.active {
-    background: rgba(201, 164, 92, 0.1);
+    background: rgba(220, 38, 38, 0.14);
     color: var(--gold);
     border-color: var(--border-gold);
 }
@@ -287,19 +289,19 @@ body {
         --card-foreground: 0 0% 98%;
         --popover: 0 0% 6%;
         --popover-foreground: 0 0% 98%;
-        --primary: 40 50% 58%;
-        --primary-foreground: 0 0% 4%;
+        --primary: 0 74% 51%;
+        --primary-foreground: 0 0% 98%;
         --secondary: 0 0% 12%;
         --secondary-foreground: 0 0% 98%;
         --muted: 0 0% 12%;
         --muted-foreground: 0 0% 65%;
-        --accent: 40 50% 58%;
-        --accent-foreground: 0 0% 4%;
+        --accent: 0 74% 51%;
+        --accent-foreground: 0 0% 98%;
         --destructive: 0 84% 60%;
         --destructive-foreground: 0 0% 98%;
         --border: 0 0% 15%;
         --input: 0 0% 15%;
-        --ring: 40 50% 58%;
+        --ring: 0 74% 51%;
         --radius: 0.75rem;
     }
 }
