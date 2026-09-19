@@ -21,7 +21,7 @@ from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field, EmailStr, ConfigDict
 
-from pdf_receipt import build_receipt_pdf, ASSETS_DIR  # noqa: F401
+from pdf_receipt import build_receipt_pdf, build_payment_receipt_pdf, ASSETS_DIR  # noqa: F401
 
 # ---------------------------------------------------------------------------
 # Config
@@ -415,7 +415,7 @@ ClientType = Literal["particular", "empresa", "lote"]
 
 class ClientCreate(BaseModel):
     tipo: ClientType = "particular"
-    nombre: str = Field(..., min_length=1, max_length=160)
+    nombre: str = Field(default="", max_length=160)
     telefono: Optional[str] = ""
     email: Optional[str] = ""
     direccion: Optional[str] = ""
@@ -456,7 +456,7 @@ async def create_client(body: ClientCreate, user: dict = Depends(get_current_use
     doc = {
         "id": str(uuid.uuid4()),
         "tipo": body.tipo,
-        "nombre": _strip(body.nombre),
+        "nombre": _strip(body.nombre) or "Cliente sin nombre",
         "telefono": _strip(body.telefono or ""),
         "email": (body.email or "").strip().lower(),
         "direccion": _strip(body.direccion or ""),
@@ -603,10 +603,10 @@ async def delete_company(cid: str, user: dict = Depends(require_role("admin", "m
 # VEHÍCULOS
 # ---------------------------------------------------------------------------
 class VehicleCreate(BaseModel):
-    client_id: str
+    client_id: Optional[str] = None
     year: Optional[int] = None
-    make: str = Field(..., min_length=1)
-    model: str = Field(..., min_length=1)
+    make: str = ""
+    model: str = ""
     engine: Optional[str] = ""
     vin: Optional[str] = ""
     plates: Optional[str] = ""
@@ -637,7 +637,7 @@ class VehicleUpdate(BaseModel):
 class VehicleOut(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str
-    client_id: str
+    client_id: Optional[str] = None
     year: Optional[int] = None
     make: str
     model: str
@@ -656,7 +656,7 @@ class VehicleOut(BaseModel):
 
 @api.post("/vehicles", response_model=VehicleOut, status_code=201)
 async def create_vehicle(body: VehicleCreate, user: dict = Depends(get_current_user)):
-    if not await db.clients.find_one({"id": body.client_id}):
+    if body.client_id and not await db.clients.find_one({"id": body.client_id}):
         raise HTTPException(400, "Cliente no válido")
     doc = body.model_dump()
     for k in ("make", "model", "engine", "vin", "plates", "drive", "color", "notes"):
@@ -804,7 +804,7 @@ class QuoteItem(BaseModel):
 
 
 class QuoteCreate(BaseModel):
-    client_id: str
+    client_id: Optional[str] = None
     vehicle_id: Optional[str] = None
     items: List[QuoteItem] = []
     tax_rate: float = 0.16  # IVA 16%
@@ -826,7 +826,7 @@ class QuoteOut(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str
     folio: str
-    client_id: str
+    client_id: Optional[str] = None
     vehicle_id: Optional[str] = None
     items: List[QuoteItem] = []
     subtotal: float
@@ -866,7 +866,7 @@ async def _next_folio(prefix: str, coll) -> str:
 
 @api.post("/quotes", response_model=QuoteOut, status_code=201)
 async def create_quote(body: QuoteCreate, user: dict = Depends(get_current_user)):
-    if not await db.clients.find_one({"id": body.client_id}):
+    if body.client_id and not await db.clients.find_one({"id": body.client_id}):
         raise HTTPException(400, "Cliente no válido")
     items = body.items or []
     subtotal, tax, total, cost, profit = _totals(items, body.tax_rate)
@@ -953,7 +953,7 @@ ServiceStatus = Literal[
 
 
 class ServiceCreate(BaseModel):
-    client_id: str
+    client_id: Optional[str] = None
     vehicle_id: Optional[str] = None
     technician_id: Optional[str] = None
     type: Optional[str] = "mantenimiento"  # diagnóstico, mantenimiento, afinación, reparación, inspección
@@ -990,7 +990,7 @@ class ServiceOut(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str
     folio: str
-    client_id: str
+    client_id: Optional[str] = None
     vehicle_id: Optional[str] = None
     technician_id: Optional[str] = None
     type: str = "mantenimiento"
@@ -1013,13 +1013,15 @@ class ServiceOut(BaseModel):
     recommendations: str = ""
     next_service_km: Optional[int] = None
     next_service_date: Optional[str] = None
+    receipt_emailed_at: Optional[str] = None
+    receipt_emailed_to: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
 
 @api.post("/services", response_model=ServiceOut, status_code=201)
 async def create_service(body: ServiceCreate, user: dict = Depends(get_current_user)):
-    if not await db.clients.find_one({"id": body.client_id}):
+    if body.client_id and not await db.clients.find_one({"id": body.client_id}):
         raise HTTPException(400, "Cliente no válido")
     items = body.items or []
     subtotal, tax, total, cost, profit = _totals(items, body.tax_rate)
@@ -1202,6 +1204,10 @@ class SettingsUpdate(BaseModel):
     currency: Optional[str] = None
     footer_note: Optional[str] = None
     survey_url: Optional[str] = None
+    bank_holder: Optional[str] = None
+    bank_name: Optional[str] = None
+    bank_card: Optional[str] = None
+    bank_clabe: Optional[str] = None
 
 
 GOOGLE_FORM_SURVEY_URL = "https://docs.google.com/forms/d/e/1FAIpQLSeFhlQ9BJmVqCUsWUDu0V1V4VqfiierYdeG-xA4_51csMMgkQ/viewform"
@@ -1216,6 +1222,10 @@ DEFAULT_SETTINGS = {
     "currency": "MXN",
     "footer_note": "Gracias por confiar en Armenta's Motors Company. Servicio automotriz móvil profesional.",
     "survey_url": GOOGLE_FORM_SURVEY_URL,
+    "bank_holder": "Adrian Armenta",
+    "bank_name": "",
+    "bank_card": "",
+    "bank_clabe": "",
 }
 
 
@@ -1505,7 +1515,240 @@ async def _enrich_doc(kind: str, doc: dict) -> dict:
     if kind == "servicio" and doc.get("technician_id"):
         t = await db.technicians.find_one({"id": doc["technician_id"]})
         if t: out["technician"] = {"id": t["id"], "name": t.get("name", "")}
+    if kind == "servicio":
+        pays = await db.payments.find({"service_id": doc["id"]}).sort("date", 1).to_list(50)
+        out["payments"] = [{"folio": p["folio"], "date": p.get("date"), "method": p.get("method"), "amount": p.get("amount", 0), "reference": p.get("reference", "")} for p in pays]
+    if kind == "nota":
+        out["client"] = out.get("client") or {"nombre": doc.get("client_name"), "telefono": doc.get("client_phone"), "email": doc.get("client_email")}
+        if doc.get("vehicle_label"): out["vehicle"] = {"make": doc["vehicle_label"]}
     return out
+
+
+RECEIPT_COLLECTIONS = {"servicio": "services", "cotizacion": "quotes", "nota": "notes"}
+
+
+@api.get("/receipts/pago/{pid}/pdf")
+async def payment_receipt_pdf(pid: str, user: dict = Depends(get_current_user)):
+    p = await db.payments.find_one({"id": pid})
+    if not p:
+        raise HTTPException(404, "Pago no encontrado")
+    ctx = await _payment_context(p)
+    settings = await _load_settings_dict()
+    pdf_bytes = build_payment_receipt_pdf(ctx, settings)
+    filename = f"{p['folio']}.pdf"
+    return Response(content=pdf_bytes, media_type="application/pdf",
+                    headers={"Content-Disposition": f'inline; filename="{filename}"', "X-Filename": filename})
+
+
+async def _payment_context(p: dict) -> dict:
+    out = _clean_doc(p)
+    if isinstance(out.get("created_at"), datetime): out["created_at"] = out["created_at"].isoformat()
+    svc = await db.services.find_one({"id": p["service_id"]}) if p.get("service_id") else None
+    client_id = p.get("client_id") or (svc or {}).get("client_id")
+    if client_id:
+        c = await db.clients.find_one({"id": client_id})
+        if c: out["client"] = {k: _clean_doc(c).get(k) for k in ("id", "nombre", "telefono", "email", "direccion")}
+    if svc:
+        out["service"] = {"folio": svc["folio"], "total": svc.get("total", 0), "paid": svc.get("paid", 0), "balance": svc.get("balance", 0), "type": svc.get("type", "")}
+        if svc.get("vehicle_id"):
+            v = await db.vehicles.find_one({"id": svc["vehicle_id"]})
+            if v: out["vehicle"] = " ".join(str(x) for x in (v.get("year"), v.get("make"), v.get("model")) if x)
+    return out
+
+
+@api.post("/payments/{pid}/send-email")
+async def send_payment_email(pid: str, user: dict = Depends(get_current_user)):
+    from html import escape
+    from email_service import send_email, EMAIL_FROM_NAME
+    p = await db.payments.find_one({"id": pid})
+    if not p:
+        raise HTTPException(404, "Pago no encontrado")
+    ctx = await _payment_context(p)
+    to = ((ctx.get("client") or {}).get("email") or "").strip()
+    if not to:
+        raise HTTPException(400, "El cliente no tiene correo registrado")
+    settings = await _load_settings_dict()
+    cur = settings.get("currency", "MXN")
+    svc = ctx.get("service") or {}
+    svc_folio = escape(str(svc.get("folio", ""))) if svc else ""
+    order_txt = f" aplicado a la orden <strong>{svc_folio}</strong>" if svc else ""
+    html = _email_shell(
+        settings, "RECIBO DE PAGO", p["folio"],
+        f'<p style="margin:0 0 12px">Hola {escape((ctx.get("client") or {}).get("nombre") or "")},</p>'
+        f'<p style="margin:0 0 12px">Confirmamos tu pago{order_txt}. Adjuntamos el recibo en PDF.</p>'
+        + _kv_table([("Monto", f"${p['amount']:,.2f} {cur}", True), ("Método", escape(str(p.get("method", ""))), False)]
+                    + ([("Saldo restante", f"${svc.get('balance', 0):,.2f} {cur}", svc.get("balance", 0) > 0)] if svc else [])),
+    )
+    email_id = await send_email(to=to, subject=f"Recibo de pago {p['folio']} · {EMAIL_FROM_NAME}", html=html,
+                                attachments=[{"filename": f"{p['folio']}.pdf", "bytes": build_payment_receipt_pdf(ctx, settings)}],
+                                reply_to=(settings.get("company_email") or None))
+    await db.payments.update_one({"id": pid}, {"$set": {"emailed_at": now_iso(), "emailed_to": to}})
+    return {"ok": True, "email_id": email_id, "to": to}
+
+
+def _kv_table(rows):
+    from html import escape
+    cells = ""
+    for i, (k, v, strong) in enumerate(rows):
+        border = "border-top:1px solid #e4e4e7;" if i else ""
+        color = "color:#dc2626;" if strong is True and k.startswith("Saldo") else ""
+        cells += (f'<tr><td style="padding:10px 14px;color:#71717a;{border}">{escape(k)}</td>'
+                  f'<td align="right" style="padding:10px 14px;font-weight:bold;{border}{color}">{v}</td></tr>')
+    return f'<table role="presentation" width="100%" style="border:1px solid #e4e4e7;border-radius:8px;margin:16px 0">{cells}</table>'
+
+
+def _email_shell(settings: dict, kicker: str, folio: str, body_html: str) -> str:
+    from html import escape
+    from email_service import EMAIL_FROM_NAME
+    survey_url = (settings.get("survey_url") or "").strip()
+    survey_block = (f'<p style="margin:18px 0 0">¿Cómo fue tu servicio? <a href="{escape(survey_url)}" style="color:#dc2626;font-weight:bold">Califícanos en 1 minuto</a>.</p>'
+                    if survey_url.startswith("https://") else "")
+    return (
+        '<table role="presentation" width="100%" style="background:#0a0a0a;padding:24px 0"><tr><td align="center">'
+        '<table role="presentation" width="560" style="background:#ffffff;border-radius:12px;font-family:Arial,sans-serif;color:#18181b">'
+        '<tr><td style="background:#0a0a0a;color:#fff;padding:20px 28px;border-radius:12px 12px 0 0">'
+        f'<div style="font-size:11px;letter-spacing:3px;color:#a1a1aa">{escape(kicker)}</div>'
+        f'<div style="font-size:24px;font-weight:bold;margin-top:4px">{escape(folio)}</div></td></tr>'
+        f'<tr><td style="padding:24px 28px">{body_html}{survey_block}'
+        f'<p style="font-size:12px;color:#888;margin-top:24px">{escape(settings.get("footer_note") or "")}</p>'
+        f'<p style="font-size:11px;color:#a1a1aa">Enviado por {escape(EMAIL_FROM_NAME)}. Nunca solicitamos contraseñas ni datos de tarjeta por correo.</p>'
+        '</td></tr></table></td></tr></table>'
+    )
+
+
+# ---------------------------------------------------------------------------
+# NOTAS DE REMISIÓN (ticket rápido)
+# ---------------------------------------------------------------------------
+class NoteCreate(BaseModel):
+    client_id: Optional[str] = None
+    client_name: Optional[str] = ""
+    client_phone: Optional[str] = ""
+    client_email: Optional[str] = ""
+    vehicle_label: Optional[str] = ""
+    items: List[QuoteItem] = []
+    tax_rate: float = 0.0
+    notes: Optional[str] = ""
+    paid_amount: float = Field(default=0, ge=0)
+    method: PaymentMethod = "cash"
+
+
+class NoteUpdate(BaseModel):
+    client_name: Optional[str] = None
+    client_phone: Optional[str] = None
+    client_email: Optional[str] = None
+    vehicle_label: Optional[str] = None
+    items: Optional[List[QuoteItem]] = None
+    tax_rate: Optional[float] = None
+    notes: Optional[str] = None
+    paid_amount: Optional[float] = Field(default=None, ge=0)
+    method: Optional[PaymentMethod] = None
+
+
+class NoteOut(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str
+    folio: str
+    client_id: Optional[str] = None
+    client_name: str = ""
+    client_phone: str = ""
+    client_email: str = ""
+    vehicle_label: str = ""
+    items: List[QuoteItem] = []
+    subtotal: float
+    tax_rate: float
+    tax: float
+    total: float
+    paid_amount: float = 0
+    balance: float = 0
+    method: PaymentMethod = "cash"
+    status: str
+    notes: str = ""
+    created_at: datetime
+    updated_at: datetime
+
+
+def _note_fill(doc: dict):
+    subtotal, tax, total, cost, profit = _totals([QuoteItem(**i) if isinstance(i, dict) else i for i in doc.get("items", [])], doc.get("tax_rate", 0))
+    paid = round(min(doc.get("paid_amount", 0) or 0, total), 2)
+    doc.update({"subtotal": subtotal, "tax": tax, "total": total, "cost_total": cost, "profit": profit,
+                "paid_amount": paid, "balance": round(total - paid, 2), "status": "pagada" if total - paid <= 0.001 else "pendiente"})
+
+
+@api.post("/notes", response_model=NoteOut, status_code=201)
+async def create_note(body: NoteCreate, user: dict = Depends(get_current_user)):
+    doc = body.model_dump()
+    doc["items"] = [it.model_dump() for it in body.items]
+    if body.client_id:
+        c = await db.clients.find_one({"id": body.client_id})
+        if c:
+            doc["client_name"] = doc["client_name"] or c.get("nombre", "")
+            doc["client_phone"] = doc["client_phone"] or c.get("telefono", "")
+            doc["client_email"] = doc["client_email"] or c.get("email", "")
+    for k in ("client_name", "client_phone", "client_email", "vehicle_label", "notes"):
+        doc[k] = (doc.get(k) or "").strip()
+    doc["client_name"] = doc["client_name"] or "Público en general"
+    _note_fill(doc)
+    doc.update({"id": str(uuid.uuid4()), "folio": await _next_folio("NR", db.notes),
+                "created_by": user["id"], "created_at": now_iso(), "updated_at": now_iso()})
+    await db.notes.insert_one(doc)
+    return NoteOut(**_clean_doc(doc))
+
+
+@api.get("/notes")
+async def list_notes(user: dict = Depends(get_current_user), q: Optional[str] = None):
+    filt = {"$or": [{"folio": {"$regex": q, "$options": "i"}}, {"client_name": {"$regex": q, "$options": "i"}}]} if q else {}
+    docs = await db.notes.find(filt).sort("created_at", -1).limit(300).to_list(300)
+    return {"items": [NoteOut(**_clean_doc(d)).model_dump() for d in docs], "total": await db.notes.count_documents(filt)}
+
+
+@api.get("/notes/{nid}")
+async def get_note(nid: str, user: dict = Depends(get_current_user)):
+    doc = await db.notes.find_one({"id": nid})
+    if not doc: raise HTTPException(404, "Nota no encontrada")
+    return await _enrich_doc("nota", doc)
+
+
+@api.patch("/notes/{nid}", response_model=NoteOut)
+async def update_note(nid: str, body: NoteUpdate, user: dict = Depends(get_current_user)):
+    doc = await db.notes.find_one({"id": nid})
+    if not doc: raise HTTPException(404, "Nota no encontrada")
+    upd = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
+    if "items" in upd: upd["items"] = [it.model_dump() for it in body.items]
+    doc.update(upd)
+    _note_fill(doc)
+    doc["updated_at"] = now_iso()
+    await db.notes.replace_one({"id": nid}, doc)
+    return NoteOut(**_clean_doc(doc))
+
+
+@api.delete("/notes/{nid}")
+async def delete_note(nid: str, user: dict = Depends(require_role("admin", "manager"))):
+    r = await db.notes.delete_one({"id": nid})
+    if r.deleted_count == 0: raise HTTPException(404, "Nota no encontrada")
+    return {"ok": True}
+
+
+@api.post("/notes/{nid}/send-email")
+async def send_note_email(nid: str, user: dict = Depends(get_current_user)):
+    from html import escape
+    from email_service import send_email, EMAIL_FROM_NAME
+    doc = await db.notes.find_one({"id": nid})
+    if not doc: raise HTTPException(404, "Nota no encontrada")
+    to = (doc.get("client_email") or "").strip()
+    if not to: raise HTTPException(400, "La nota no tiene correo del cliente")
+    settings = await _load_settings_dict()
+    cur = settings.get("currency", "MXN")
+    enriched = await _enrich_doc("nota", doc)
+    html = _email_shell(settings, "NOTA DE REMISIÓN", doc["folio"],
+        f'<p style="margin:0 0 12px">Hola {escape(doc.get("client_name") or "")},</p>'
+        f'<p style="margin:0 0 12px">Adjuntamos tu nota de remisión en PDF.</p>'
+        + _kv_table([("Total", f"${doc.get('total', 0):,.2f} {cur}", True), ("Pagado", f"${doc.get('paid_amount', 0):,.2f} {cur}", False),
+                     ("Saldo pendiente", f"${doc.get('balance', 0):,.2f} {cur}", doc.get("balance", 0) > 0)]))
+    email_id = await send_email(to=to, subject=f"Nota {doc['folio']} · {EMAIL_FROM_NAME}", html=html,
+                                attachments=[{"filename": f"{doc['folio']}.pdf", "bytes": build_receipt_pdf(enriched, settings, kind="nota")}],
+                                reply_to=(settings.get("company_email") or None))
+    await db.notes.update_one({"id": nid}, {"$set": {"emailed_at": now_iso(), "emailed_to": to}})
+    return {"ok": True, "email_id": email_id, "to": to}
 
 
 @api.get("/receipts/{kind}/{doc_id}/pdf")
@@ -1515,34 +1758,16 @@ async def receipt_pdf(
     include_photos: bool = Query(True, description="Adjuntar evidencias como anexo"),
     user: dict = Depends(get_current_user),
 ):
-    if kind not in ("servicio", "cotizacion"):
+    if kind not in RECEIPT_COLLECTIONS:
         raise HTTPException(status_code=400, detail="Tipo inválido")
-    coll = db.services if kind == "servicio" else db.quotes
+    coll = db[RECEIPT_COLLECTIONS[kind]]
     doc = await coll.find_one({"id": doc_id})
     if not doc:
         raise HTTPException(status_code=404, detail="Documento no encontrado")
     enriched = await _enrich_doc(kind, doc)
     settings = await _load_settings_dict()
 
-    photos_payload = None
-    if kind == "servicio" and include_photos:
-        photos_payload = []
-        file_docs = await db.files.find(
-            {"service_id": doc_id, "is_deleted": False},
-            {"_id": 0},
-        ).sort("created_at", 1).to_list(24)
-        for f in file_docs:
-            if not (f.get("content_type") or "").startswith("image/"):
-                continue
-            try:
-                data, _ct = get_object(f["storage_path"])
-                photos_payload.append({
-                    "bytes": data,
-                    "caption": f.get("original_filename", ""),
-                })
-            except Exception as exc:
-                logger.warning("Photo fetch failed for %s: %s", f.get("id"), exc)
-        photos_payload = photos_payload or None
+    photos_payload = await _service_photos_payload(doc_id) if (kind == "servicio" and include_photos) else None
 
     pdf_bytes = build_receipt_pdf(enriched, settings, kind=kind, photos=photos_payload)
     filename = f"{enriched.get('folio', 'recibo')}.pdf"
@@ -1554,6 +1779,54 @@ async def receipt_pdf(
             "X-Filename": filename,
         },
     )
+
+
+async def _service_photos_payload(doc_id: str):
+    out = []
+    file_docs = await db.files.find({"service_id": doc_id, "is_deleted": False}, {"_id": 0}).sort("created_at", 1).to_list(24)
+    for f in file_docs:
+        if not (f.get("content_type") or "").startswith("image/"):
+            continue
+        try:
+            data, _ct = get_object(f["storage_path"])
+            out.append({"bytes": data, "caption": f.get("original_filename", "")})
+        except Exception as exc:
+            logger.warning("Photo fetch failed for %s: %s", f.get("id"), exc)
+    return out or None
+
+
+@api.post("/services/{sid}/send-receipt-email")
+async def send_service_receipt_email(sid: str, user: dict = Depends(get_current_user)):
+    from email_service import send_email, EMAIL_FROM_NAME
+    doc = await db.services.find_one({"id": sid})
+    if not doc:
+        raise HTTPException(404, "Servicio no encontrado")
+    enriched = await _enrich_doc("servicio", doc)
+    client_email = ((enriched.get("client") or {}).get("email") or "").strip()
+    if not client_email:
+        raise HTTPException(400, "El cliente no tiene correo registrado")
+    settings = await _load_settings_dict()
+    pdf_bytes = build_receipt_pdf(enriched, settings, kind="servicio", photos=await _service_photos_payload(sid))
+    folio = enriched.get("folio", "recibo")
+    from html import escape as _esc
+    client_name = _esc((enriched.get("client") or {}).get("nombre") or "")
+    vehicle = enriched.get("vehicle") or {}
+    vehicle_label = _esc(" ".join(str(x) for x in (vehicle.get("year"), vehicle.get("make"), vehicle.get("model")) if x))
+    cur = settings.get("currency", "MXN")
+    balance = enriched.get("balance", 0) or 0
+    html = _email_shell(settings, "ORDEN DE SERVICIO", folio,
+        f'<p style="margin:0 0 12px">Hola {client_name},</p>'
+        f'<p style="margin:0 0 12px">Adjuntamos el recibo de tu servicio{f" para tu <strong>{vehicle_label}</strong>" if vehicle_label else ""}.</p>'
+        + _kv_table([("Total", f"${enriched.get('total', 0):,.2f} {cur}", True), ("Saldo pendiente", f"${balance:,.2f} {cur}", balance > 0)]))
+    email_id = await send_email(
+        to=client_email,
+        subject=f"Recibo {folio} · {EMAIL_FROM_NAME}",
+        html=html,
+        attachments=[{"filename": f"{folio}.pdf", "bytes": pdf_bytes}],
+        reply_to=(settings.get("company_email") or None),
+    )
+    await db.services.update_one({"id": sid}, {"$set": {"receipt_emailed_at": now_iso(), "receipt_emailed_to": client_email}})
+    return {"ok": True, "email_id": email_id, "to": client_email}
 
 
 # ---------------------------------------------------------------------------

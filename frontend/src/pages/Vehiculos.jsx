@@ -31,13 +31,10 @@ function VehicleForm({ initial, clients, onClose, onSaved }) {
   const submit = async (e) => {
     e.preventDefault();
     setErr("");
-    if (!f.client_id || !f.make || !f.model) {
-      setErr(t.common.required);
-      return;
-    }
     setSaving(true);
     const payload = { ...f };
     if (payload.year === "") delete payload.year;
+    if (!payload.client_id) delete payload.client_id;
     if (payload.mileage === "") payload.mileage = 0;
     if (payload.next_service_km === "") delete payload.next_service_km;
     if (payload.next_service_date === "") delete payload.next_service_date;
@@ -144,7 +141,7 @@ export default function Vehiculos() {
         title={t.vehiculos.title}
         subtitle={t.vehiculos.subtitle}
         action={
-          <button type="button" onClick={() => { setEditing(null); setFormOpen(true); }} className="armenta-btn-primary !w-auto !h-12 !px-5 flex items-center gap-2" data-testid="vehiculos-new" disabled={clients.length === 0}>
+          <button type="button" onClick={() => { setEditing(null); setFormOpen(true); }} className="armenta-btn-primary !w-auto !h-12 !px-5 flex items-center gap-2" data-testid="vehiculos-new">
             <Plus size={16} /> {t.vehiculos.new}
           </button>
         }

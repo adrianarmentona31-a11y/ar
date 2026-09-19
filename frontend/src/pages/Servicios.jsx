@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Plus, Trash2, Wrench, Receipt as ReceiptIcon, Upload, Image as ImageIcon, X, Zap, MessageSquareHeart } from "lucide-react";
+import { Plus, Trash2, Wrench, Receipt as ReceiptIcon, Upload, Image as ImageIcon, X, Zap, MessageSquareHeart, Mail } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import { api, formatApiError } from "../lib/api";
@@ -7,6 +7,26 @@ import { useI18n } from "../context/I18nContext";
 import { fmtDate, fmtMoney } from "../lib/format";
 import { Modal, Field, Input, Textarea, Select, PageHeader, StatusBadge } from "../components/ui-kit";
 import { whatsappSurveyUrl } from "../lib/surveyLink";
+
+function EmailReceiptButton({ service }) {
+  const { t } = useI18n();
+  const [busy, setBusy] = useState(false);
+  const email = service.client?.email;
+  const send = async () => {
+    if (!email) return toast.error(t.servicios.no_client_email);
+    setBusy(true);
+    try {
+      const { data } = await api.post(`/services/${service.id}/send-receipt-email`);
+      toast.success(`${t.servicios.receipt_sent} ${data.to}`);
+    } catch (e) { toast.error(formatApiError(e)); }
+    finally { setBusy(false); }
+  };
+  return (
+    <button type="button" onClick={send} disabled={busy} title={email || t.servicios.no_client_email} className={`h-12 px-4 rounded-lg border flex items-center justify-center gap-2 text-sm font-semibold ${email ? "border-sky-800/60 bg-sky-950/30 text-sky-300" : "border-[#262626] text-zinc-600"}`} data-testid="service-email-receipt">
+      {busy ? <span className="spinner" /> : <Mail size={14} />}{t.servicios.email_receipt}
+    </button>
+  );
+}
 
 function SurveyButton({ service }) {
   const { t } = useI18n();
@@ -282,6 +302,8 @@ function ServiceForm({ initial, clients, vehicles, technicians, onClose, onSaved
   const [items, setItems] = useState(initial?.items || []);
   const [taxRate, setTaxRate] = useState(initial?.tax_rate ?? 0.16);
   const [saving, setSaving] = useState(false);
+  const [surveyUrl, setSurveyUrl] = useState("");
+  useEffect(() => { api.get("/settings").then((r) => setSurveyUrl(r.data.survey_url || "")).catch(() => {}); }, []);
   const editing = !!initial?.id;
   const set = (k) => (v) => setF((s) => ({ ...s, [k]: v }));
 
@@ -289,18 +311,26 @@ function ServiceForm({ initial, clients, vehicles, technicians, onClose, onSaved
 
   const submit = async (e) => {
     e.preventDefault();
-    if (!f.client_id) return toast.error(t.common.required);
     setSaving(true);
     const payload = { ...f, items, tax_rate: taxRate };
     if (!payload.vehicle_id) delete payload.vehicle_id;
+    if (!payload.client_id) delete payload.client_id;
     if (!payload.technician_id) delete payload.technician_id;
     if (!payload.scheduled_at) delete payload.scheduled_at;
+    const becomesDelivered = editing && f.status === "delivered" && initial.status !== "delivered";
+    let waWindow = null;
+    if (becomesDelivered && surveyUrl) {
+      const client = clients.find((c) => c.id === f.client_id);
+      waWindow = window.open(whatsappSurveyUrl({ clientName: client?.nombre, clientPhone: client?.telefono, folio: initial.folio, surveyUrl }), "_blank", "noopener");
+    }
     try {
       editing
         ? await api.patch(`/services/${initial.id}`, payload)
         : await api.post("/services", payload);
-      toast.success(t.servicios.saved); onSaved();
-    } catch (e2) { toast.error(formatApiError(e2)); }
+      toast.success(t.servicios.saved);
+      if (becomesDelivered && surveyUrl) toast.success(t.servicios.survey_auto);
+      onSaved();
+    } catch (e2) { if (waWindow) waWindow.close(); toast.error(formatApiError(e2)); }
     finally { setSaving(false); }
   };
 
@@ -350,6 +380,7 @@ function ServiceForm({ initial, clients, vehicles, technicians, onClose, onSaved
           <button type="submit" className="armenta-btn-primary flex-1 !h-12" disabled={saving} data-testid="service-submit">{saving ? t.common.saving : t.common.save}</button>
           {editing && <Link to={`/recibo/servicio/${initial.id}`} className="h-12 px-4 rounded-lg border border-[#dc262666] bg-[#dc262614] text-[#dc2626] hover:bg-[#dc262622] flex items-center justify-center gap-2 text-sm font-semibold" data-testid="service-view-receipt"><ReceiptIcon size={14} />{t.servicios.view_receipt}</Link>}
           {editing && <SurveyButton service={initial} />}
+          {editing && <EmailReceiptButton service={initial} />}
           {editing && <button type="button" onClick={doDelete} className="h-12 px-4 rounded-lg border border-red-900/60 bg-red-950/30 text-red-300 flex items-center gap-2 text-sm"><Trash2 size={14} />{t.common.delete}</button>}
           <button type="button" onClick={onClose} className="armenta-btn-ghost !h-12 !px-4">{t.common.cancel}</button>
         </div>
@@ -406,7 +437,7 @@ export default function Servicios() {
       <PageHeader
         title={t.servicios.title}
         subtitle={t.servicios.subtitle}
-        action={<button onClick={() => { setEditing(null); setFormOpen(true); }} className="armenta-btn-primary !w-auto !h-12 !px-5 flex items-center gap-2" data-testid="servicios-new" disabled={clients.length === 0}><Plus size={16} />{t.servicios.new}</button>}
+        action={<button onClick={() => { setEditing(null); setFormOpen(true); }} className="armenta-btn-primary !w-auto !h-12 !px-5 flex items-center gap-2" data-testid="servicios-new"><Plus size={16} />{t.servicios.new}</button>}
       />
       <div className="card-tactical p-3 flex gap-2 overflow-x-auto">
         {statusFilters.map((s) => (

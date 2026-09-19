@@ -1,10 +1,43 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { Plus, Wallet, Trash2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Plus, Wallet, Trash2, Download, Mail, Send, Landmark } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatApiError } from "../lib/api";
 import { useI18n } from "../context/I18nContext";
 import { fmtDate, fmtMoney } from "../lib/format";
 import { Modal, Field, Input, Textarea, Select, PageHeader, StatusBadge } from "../components/ui-kit";
+
+function PaymentActions({ p, client, service, t }) {
+  const [busy, setBusy] = useState("");
+  const pdf = async () => {
+    setBusy("pdf");
+    try {
+      const res = await api.get(`/receipts/pago/${p.id}/pdf`, { responseType: "blob" });
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
+      const a = document.createElement("a"); a.href = url; a.download = `${p.folio}.pdf`; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => window.URL.revokeObjectURL(url), 250);
+    } catch (e) { toast.error(formatApiError(e)); } finally { setBusy(""); }
+  };
+  const email = async () => {
+    if (!client?.email) return toast.error(t.servicios.no_client_email);
+    setBusy("email");
+    try { const { data } = await api.post(`/payments/${p.id}/send-email`); toast.success(`${t.cobros.receipt_sent} ${data.to}`); }
+    catch (e) { toast.error(formatApiError(e)); } finally { setBusy(""); }
+  };
+  const wa = () => {
+    const phone = (client?.telefono || "").replace(/\D/g, "");
+    const name = (client?.nombre || "").split(" ")[0];
+    const text = `Hola${name ? ` ${name}` : ""}, confirmamos tu pago ${p.folio} por ${fmtMoney(p.amount)} (${t.cobros.methods[p.method] || p.method})${service ? ` aplicado a la orden ${service.folio}. Saldo pendiente: ${fmtMoney(service.balance)}` : ""}. Gracias por tu confianza — Armenta's Motors Company.`;
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, "_blank", "noopener");
+  };
+  return (
+    <div className="flex items-center justify-end gap-1.5">
+      <button onClick={pdf} disabled={!!busy} title="PDF" className="h-8 w-8 rounded-md border border-[#262626] text-zinc-400 hover:text-white flex items-center justify-center" data-testid={`payment-pdf-${p.id}`}>{busy === "pdf" ? <span className="spinner" /> : <Download size={13} />}</button>
+      <button onClick={wa} disabled={!client?.telefono} title="WhatsApp" className="h-8 w-8 rounded-md border border-emerald-800/60 text-emerald-300 flex items-center justify-center disabled:opacity-30" data-testid={`payment-wa-${p.id}`}><Send size={13} /></button>
+      <button onClick={email} disabled={!!busy} title={client?.email || t.servicios.no_client_email} className={`h-8 w-8 rounded-md border flex items-center justify-center ${client?.email ? "border-sky-800/60 text-sky-300" : "border-[#262626] text-zinc-600"}`} data-testid={`payment-email-${p.id}`}>{busy === "email" ? <span className="spinner" /> : <Mail size={13} />}</button>
+    </div>
+  );
+}
 
 function PaymentForm({ clients, services, onClose, onSaved }) {
   const { t } = useI18n();
@@ -17,7 +50,7 @@ function PaymentForm({ clients, services, onClose, onSaved }) {
 
   const submit = async (e) => {
     e.preventDefault();
-    if (!f.amount || f.amount <= 0) return toast.error("Monto inválido");
+    if (!f.amount || f.amount <= 0) return toast.error(t.cobros.invalid_amount);
     setSaving(true);
     const payload = { ...f };
     if (!payload.service_id) delete payload.service_id;
@@ -61,9 +94,11 @@ function PaymentForm({ clients, services, onClose, onSaved }) {
 
 export default function Cobros() {
   const { t } = useI18n();
+  const navigate = useNavigate();
   const [items, setItems] = useState([]);
   const [clients, setClients] = useState([]);
   const [services, setServices] = useState([]);
+  const [allServices, setAllServices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [formOpen, setFormOpen] = useState(false);
 
@@ -77,6 +112,7 @@ export default function Cobros() {
       ]);
       setItems(p.data.items || []);
       setClients(c.data.items || []);
+      setAllServices(s.data.items || []);
       setServices((s.data.items || []).filter((x) => x.balance > 0));
     } catch (e) { toast.error(formatApiError(e)); }
     finally { setLoading(false); }
@@ -96,7 +132,7 @@ export default function Cobros() {
       <PageHeader
         title={t.cobros.title}
         subtitle={t.cobros.subtitle}
-        action={<button onClick={() => setFormOpen(true)} className="armenta-btn-primary !w-auto !h-12 !px-5 flex items-center gap-2" data-testid="cobros-new"><Plus size={16} />{t.cobros.new}</button>}
+        action={<div className="flex gap-2"><button onClick={() => navigate("/transferencia")} className="armenta-btn-ghost !h-12 !px-4 flex items-center gap-2" data-testid="cobros-transfer"><Landmark size={16} />{t.transferencia.title}</button><button onClick={() => setFormOpen(true)} className="armenta-btn-primary !w-auto !h-12 !px-5 flex items-center gap-2" data-testid="cobros-new"><Plus size={16} />{t.cobros.new}</button></div>}
       />
       {loading ? <div className="card-tactical p-10 flex justify-center"><span className="spinner spinner-gold" /></div>
         : items.length === 0 ? <div className="card-tactical p-8 text-center"><Wallet size={28} className="text-[#dc2626] mx-auto mb-3" /><p className="text-sm text-zinc-400">{t.cobros.empty}</p></div>
@@ -121,7 +157,10 @@ export default function Cobros() {
                     <td className="px-4 py-3"><StatusBadge label={t.cobros.methods[p.method] || p.method} /></td>
                     <td className="px-4 py-3 text-right text-white font-mono-tactical font-bold">{fmtMoney(p.amount)}</td>
                     <td className="px-4 py-3 text-right">
-                      <button onClick={() => del(p.id)} className="text-zinc-500 hover:text-red-400"><Trash2 size={14} /></button>
+                      <div className="flex items-center justify-end gap-2">
+                        <PaymentActions p={p} t={t} client={clients.find((c) => c.id === (p.client_id || allServices.find((s) => s.id === p.service_id)?.client_id))} service={allServices.find((s) => s.id === p.service_id)} />
+                        <button onClick={() => del(p.id)} className="text-zinc-500 hover:text-red-400" data-testid={`payment-rm-${p.id}`}><Trash2 size={14} /></button>
+                      </div>
                     </td>
                   </tr>
                 ))}

@@ -61,10 +61,6 @@ function ClientForm({ initial, onClose, onSaved, onDelete }) {
   const submit = async (e) => {
     e.preventDefault();
     setErr("");
-    if (!nombre.trim()) {
-      setErr(t.clientes.form.nombre);
-      return;
-    }
     setSaving(true);
     const payload = { tipo, nombre, telefono, email, direccion, notas };
     try {

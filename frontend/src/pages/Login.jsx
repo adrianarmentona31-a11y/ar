@@ -4,7 +4,6 @@ import { Eye, EyeOff, User, Lock, Globe, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../context/I18nContext";
-import { BrandMark } from "../components/BrandMark";
 import { ArmentaWordmark } from "../components/ArmentaWordmark";
 
 // REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
@@ -67,8 +66,7 @@ export default function Login() {
 
         <div className="w-full max-w-md">
           <div className="flex flex-col items-center mb-8">
-            <BrandMark size={88} glow className="mb-4" />
-            <ArmentaWordmark width={300} className="mb-3" />
+            <ArmentaWordmark width={380} className="mb-1 -mt-4" />
             <div className="brand-ribbon" data-testid="login-ribbon">Servicio a domicilio</div>
             <p className="text-xs text-zinc-500 mt-3 font-mono-tactical tracking-[0.28em] uppercase">
               {t.brand.tagline}

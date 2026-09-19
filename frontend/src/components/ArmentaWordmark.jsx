@@ -1,18 +1,13 @@
 import React from "react";
 
-const WORDMARK_SRC = "/armenta_wordmark.png";
+const LOGO_SRC = "/armenta_logo.png";
 
-/**
- * ARMENTA'S MOTORS — official primary logo (chrome oval + red car silhouette
- * + ARMENTA'S / MOTORS wordmark). Renders the raster asset exactly as provided
- * in the brand identity system.
- */
-export function ArmentaWordmark({ width = 320, className = "" }) {
+export function ArmentaWordmark({ width = 320, className = "", glow = true }) {
   return (
     <img
-      src={WORDMARK_SRC}
+      src={LOGO_SRC}
       alt="ARMENTA'S MOTORS"
-      style={{ width, height: "auto" }}
+      style={{ width, height: "auto", filter: glow ? "drop-shadow(0 0 28px rgba(220,38,38,0.25))" : undefined }}
       className={`object-contain select-none ${className}`}
       draggable={false}
     />

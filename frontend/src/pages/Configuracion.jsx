@@ -52,6 +52,13 @@ export default function Configuracion() {
         </div>
         <Field label={t.configuracion.footer_note}><Textarea testId="cfg-footer" value={f.footer_note} onChange={set("footer_note")} rows={3} /></Field>
         <Field label={t.configuracion.survey_url}><Input testId="cfg-survey-url" value={f.survey_url} onChange={set("survey_url")} placeholder="https://docs.google.com/forms/..." /></Field>
+        <div className="pt-2 font-mono-tactical text-[10px] uppercase tracking-widest text-[#dc2626]">{t.transferencia.title}</div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Field label={t.transferencia.holder}><Input testId="cfg-bank-holder" value={f.bank_holder} onChange={set("bank_holder")} /></Field>
+          <Field label={t.transferencia.bank}><Input testId="cfg-bank-name" value={f.bank_name} onChange={set("bank_name")} placeholder="BBVA, Banorte…" /></Field>
+          <Field label={t.transferencia.card}><Input testId="cfg-bank-card" value={f.bank_card} onChange={set("bank_card")} placeholder="16 dígitos" /></Field>
+          <Field label="CLABE"><Input testId="cfg-bank-clabe" value={f.bank_clabe} onChange={set("bank_clabe")} placeholder="18 dígitos" /></Field>
+        </div>
         <button type="submit" className="armenta-btn-primary !w-auto !h-12 !px-6 flex items-center gap-2" disabled={saving} data-testid="cfg-save">
           <Save size={14} />{saving ? t.common.saving : t.configuracion.save}
         </button>

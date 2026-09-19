@@ -5,8 +5,6 @@ import { toast } from "sonner";
 import { api, formatApiError } from "../lib/api";
 import { useI18n } from "../context/I18nContext";
 import { fmtMoney, fmtDate } from "../lib/format";
-import { BrandMark } from "../components/BrandMark";
-import { ArmentaWordmark } from "../components/ArmentaWordmark";
 
 /**
  * Receipt / sales preview. Works for both quotes and services.
@@ -50,7 +48,7 @@ export default function Recibo() {
     (async () => {
       setLoading(true);
       try {
-        const endpoint = kind === "cotizacion" ? `/quotes/${id}` : `/services/${id}`;
+        const endpoint = kind === "cotizacion" ? `/quotes/${id}` : kind === "nota" ? `/notes/${id}` : `/services/${id}`;
         const [{ data: d }, { data: s }] = await Promise.all([
           api.get(endpoint),
           api.get("/settings").catch(() => ({ data: {} })),
@@ -69,12 +67,15 @@ export default function Recibo() {
   const currency = settings?.currency || "MXN";
   const money = (v) => fmtMoney(v, currency, locale === "es" ? "es-MX" : "en-US");
   const isQuote = kind === "cotizacion";
+  const isNote = kind === "nota";
+  const docTitle = isQuote ? "COTIZACIÓN DE SERVICIO" : isNote ? "NOTA DE REMISIÓN" : "ORDEN DE SERVICIO";
 
   const statusLabel = useMemo(() => {
     if (!doc) return "";
     if (isQuote) return t.cotizaciones.statuses[doc.status] || doc.status;
+    if (isNote) return doc.status === "pagada" ? t.notas.paid : t.notas.pending;
     return t.servicios.statuses[doc.status] || doc.status;
-  }, [doc, isQuote, t]);
+  }, [doc, isQuote, isNote, t]);
 
   if (loading) return <div className="min-h-[60vh] flex items-center justify-center"><span className="spinner spinner-gold" /></div>;
   if (notFound || !doc) {
@@ -107,23 +108,22 @@ export default function Recibo() {
       {/* Paper */}
       <div id="receipt-paper" className="receipt-paper" data-testid="recibo-paper">
         {/* Header */}
-        <div className="receipt-header">
-          <div className="flex items-center gap-5">
-            <BrandMark size={72} />
-            <div>
-              <ArmentaWordmark width={220} />
-              <div className="receipt-meta">
-                {settings?.company_address && <div>{settings.company_address}</div>}
-                {settings?.company_phone && <div>Tel. {settings.company_phone}</div>}
-                {settings?.company_email && <div>{settings.company_email}</div>}
-                {settings?.company_rfc && <div>RFC: {settings.company_rfc}</div>}
-              </div>
-            </div>
+        <div className="receipt-header receipt-header-simple">
+          <div className="receipt-logo-box"><img src="/armenta_wordmark.png" alt="ARMENTA'S MOTORS" /></div>
+          <div className="receipt-company">{settings?.company_name?.toUpperCase() || "ARMENTA'S MOTORS"}</div>
+          <div className="receipt-meta">
+            <div>Servicio Automotriz Profesional a Domicilio</div>
+            {settings?.company_address && <div>{settings.company_address}</div>}
+            {settings?.company_phone && <div>Tel. {settings.company_phone}</div>}
+            {settings?.company_email && <div>{settings.company_email}</div>}
+            {settings?.company_rfc && <div>RFC: {settings.company_rfc}</div>}
           </div>
-          <div className="receipt-folio">
-            <div className="receipt-folio-label">{isQuote ? "COTIZACIÓN" : "ORDEN DE SERVICIO"}</div>
-            <div className="receipt-folio-value">{doc.folio}</div>
-            <div className="receipt-status">{statusLabel}</div>
+          <div className="receipt-title-row">
+            <h1 className="receipt-doc-title">{docTitle}</h1>
+            <div className="receipt-folio">
+              <div className="receipt-folio-value">{doc.folio}</div>
+              <div className="receipt-status">{statusLabel}</div>
+            </div>
           </div>
         </div>
 
@@ -213,7 +213,7 @@ export default function Recibo() {
             <>
               <div className="totals-row">
                 <span>{t.recibo.paid}</span>
-                <span>{money(doc.paid || 0)}</span>
+                <span>{money(isNote ? doc.paid_amount || 0 : doc.paid || 0)}</span>
               </div>
               <div className={`totals-row balance ${doc.balance > 0 ? "outstanding" : "settled"}`}>
                 <span>{t.recibo.balance}</span>
@@ -222,6 +222,15 @@ export default function Recibo() {
             </>
           )}
         </div>
+
+        {!isQuote && !isNote && (doc.payments || []).length > 0 && (
+          <div className="receipt-notes" data-testid="recibo-payments">
+            <div className="receipt-label">{t.recibo.payments}</div>
+            {doc.payments.map((p) => (
+              <div key={p.folio} className="totals-row"><span>{p.folio} · {fmtDate(p.date)} · {t.cobros.methods[p.method] || p.method}</span><span>{money(p.amount)}</span></div>
+            ))}
+          </div>
+        )}
 
         {/* Notes */}
         {(doc.notes || (isQuote === false && doc.recommendations)) && (

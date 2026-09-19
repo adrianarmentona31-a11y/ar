@@ -26,6 +26,8 @@ import Tecnicos from "@/pages/Tecnicos";
 import Empresas from "@/pages/Empresas";
 import Configuracion from "@/pages/Configuracion";
 import Recibo from "@/pages/Recibo";
+import Notas from "@/pages/Notas";
+import Transferencia from "@/pages/Transferencia";
 
 function ProtectedShell({ children }) {
   return (
@@ -47,6 +49,8 @@ const ROUTES = [
   { path: "/empresas", el: <Empresas /> },
   { path: "/configuracion", el: <Configuracion /> },
   { path: "/recibo/:kind/:id", el: <Recibo /> },
+  { path: "/notas", el: <Notas /> },
+  { path: "/transferencia", el: <Transferencia /> },
 ];
 
 export default function App() {

@@ -75,10 +75,10 @@ function QuoteForm({ initial, clients, vehicles, onClose, onSaved }) {
 
   const submit = async (e) => {
     e.preventDefault();
-    if (!f.client_id) return toast.error(t.common.required);
     setSaving(true);
     const payload = { ...f, items, tax_rate: taxRate };
     if (!payload.vehicle_id) delete payload.vehicle_id;
+    if (!payload.client_id) delete payload.client_id;
     try {
       editing ? await api.patch(`/quotes/${initial.id}`, payload) : await api.post("/quotes", payload);
       toast.success(t.cotizaciones.saved); onSaved();
@@ -159,7 +159,7 @@ export default function Cotizaciones() {
       <PageHeader
         title={t.cotizaciones.title}
         subtitle={t.cotizaciones.subtitle}
-        action={<button onClick={() => { setEditing(null); setFormOpen(true); }} className="armenta-btn-primary !w-auto !h-12 !px-5 flex items-center gap-2" data-testid="cotizaciones-new" disabled={clients.length === 0}><Plus size={16} />{t.cotizaciones.new}</button>}
+        action={<button onClick={() => { setEditing(null); setFormOpen(true); }} className="armenta-btn-primary !w-auto !h-12 !px-5 flex items-center gap-2" data-testid="cotizaciones-new"><Plus size={16} />{t.cotizaciones.new}</button>}
       />
       {loading ? <div className="card-tactical p-10 flex justify-center"><span className="spinner spinner-gold" /></div>
         : items.length === 0 ? <div className="card-tactical p-8 text-center"><FileText size={28} className="text-[#dc2626] mx-auto mb-3" /><p className="text-sm text-zinc-400">{t.cotizaciones.empty}</p></div>

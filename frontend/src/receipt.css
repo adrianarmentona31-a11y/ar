@@ -26,6 +26,49 @@
     flex-wrap: wrap;
 }
 
+.receipt-header-simple {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+}
+.receipt-logo-box {
+    background: #1a1a1a;
+    width: 360px;
+    max-width: 100%;
+    margin: 0 auto;
+    padding: 12px 24px;
+    border-radius: 4px;
+    display: flex;
+    justify-content: center;
+}
+.receipt-logo-box img { width: 100%; height: auto; }
+.receipt-company {
+    text-align: center;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 30px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    margin-top: 12px;
+}
+.receipt-header-simple .receipt-meta { margin-top: 6px; text-align: center; }
+.receipt-title-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 16px;
+    margin-top: 28px;
+    flex-wrap: wrap;
+}
+.receipt-doc-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    margin: 0;
+}
+.receipt-header-simple .receipt-folio { min-width: 150px; padding: 8px 14px; }
+.receipt-header-simple .receipt-folio-value { font-size: 22px; }
+
 .receipt-meta {
     margin-top: 8px;
     font-size: 10px;

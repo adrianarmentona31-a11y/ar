@@ -11,6 +11,7 @@ import {
   HardHat,
   Building2,
   Settings,
+  ReceiptText,
 } from "lucide-react";
 import { useI18n } from "../context/I18nContext";
 
@@ -21,6 +22,7 @@ export const NAV_ITEMS = [
   { key: "servicios", to: "/servicios", icon: Wrench, testId: "nav-item-servicios", enabled: true },
   { key: "cotizaciones", to: "/cotizaciones", icon: FileText, testId: "nav-item-cotizaciones", enabled: true },
   { key: "cobros", to: "/cobros", icon: Wallet, testId: "nav-item-cobros", enabled: true },
+  { key: "notas", to: "/notas", icon: ReceiptText, testId: "nav-item-notas", enabled: true },
   { key: "finanzas", to: "/finanzas", icon: LineChart, testId: "nav-item-finanzas", enabled: true },
   { key: "tecnicos", to: "/tecnicos", icon: HardHat, testId: "nav-item-tecnicos", enabled: true },
   { key: "empresas", to: "/empresas", icon: Building2, testId: "nav-item-empresas", enabled: true },
