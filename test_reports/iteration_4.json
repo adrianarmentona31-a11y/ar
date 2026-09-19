@@ -1,0 +1,29 @@
+{
+  "summary": "ARMENTA OS Iteration 4 (security hardening) fully tested. Backend: 24/24 new security tests PASS (viewer RBAC 200/403 across clients/services/notes/payments/AI/finance/settings/team; admin bank_card+bank_clabe visible in /settings only; team CRUD invite/duplicate-409/patch role/patch active/self-guards 400 for demote-deactivate-delete self; deactivated flow: PATCH active:false → login 403 + existing JWT 401, then re-activation restores; file view-token flow: 200 download with file token, 401 when access JWT passed via ?auth=, 200 with Authorization Bearer; POST /auth/session with bogus session_id → 401, missing → 400; brute force: 10 wrong logins 401 then 11th 429 'Demasiados intentos'; CORS Origin header from allowlist (no *)). Regression 20/20 still pass. Frontend: login page has NO data-testid login-ribbon and NO text 'Servicio a domicilio'; hex logo /armenta_logo.png visible. Admin /configuracion shows team-panel; invite via team-email/team-name/team-role/team-invite adds row; team-role-* select and team-active-* toggle work; own admin row has role/active/rm all disabled; team-rm-* deletes row. Admin /servicios list loads. Viewer login OK; /configuracion does NOT show team-panel; /finanzas returns 403 in network but page renders without crash (empty state); /servicios list loads for viewer with SOLO LECTURA badge visible in header.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_security_hardening.py",
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/iter4_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py is now 2008 lines — split by domain (auth, files, team, clients, services, notes, settings, ai) before it hits 3k.",
+    "In-memory rate limiter (_RATE dict) is per-process; behind multi-worker (uvicorn --workers>1) or restart the brute-force protection is trivially bypassed. Move to Redis / DB counter with TTL.",
+    "google_session_exchange: user_doc.get('active', True) check on line 298 uses `if not ... : raise ... else: update ...` structure — the else branch updates fields on the just-inserted new admin doc, but for pre-existing INACTIVE users the else never runs (good) yet the `user_doc.update` for the invited-but-not-yet-google-linked case is inside the else. Verify inactive existing user path returns 403 (it does — tested).",
+    "download_file: `request._headers = None` line 415 is a no-op guard on a private attr; remove — it does nothing and is misleading.",
+    "AI quota rate_limit(f'ai:{user_id}', 30, 86400) uses in-memory deque; a backend restart resets quota. Persist counters per user per day in Mongo for real enforcement.",
+    "TeamUpdate PATCH allows changing name/role/active but there is no email/username change path and no re-invitation email is sent. UX may confuse admins since new users can't log in until they use Google (google_linked false, no password). Consider explicit 'send magic-link' or password reset for invited users.",
+    "seed_admin only updates password_hash — if admin's role has been changed to viewer in Mongo it will NOT be restored. Consider re-affirming role:'admin' too.",
+    "settings redaction: only bank_card and bank_clabe are hidden for non-finance roles. Verify bank_holder/bank_bank (if any PII) don't leak — currently they are still shown to viewer (tested)."
+  ],
+  "updated_files": ["/app/backend/tests/test_security_hardening.py"],
+  "success_rate": {"backend": "100% (24/24 new + 20/20 regression)", "frontend": "100%"},
+  "test_credentials": "admin/armenta123 and viewer/viewer123 (viewer left active with role=viewer after tests)",
+  "seed_data_creation": "Test file uploaded and deleted (soft-delete) during file token tests. Team invites are cleaned up in fixtures. No leftover test rows.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "New security suite at /app/backend/tests/test_security_hardening.py covers 24 hardening cases. Regression at /app/backend/tests/backend_test.py still 20/20. Run: cd /app && python -m pytest backend/tests/ -v -n0. Rate limiter is per-process in-memory — restarting backend resets brute-force counters. Do NOT exceed 15 failed logins/IP in 5 min to avoid locking admin. Viewer user (username=viewer, pw=viewer123) is active with role=viewer at end of run. Deactivation test always re-activates in a finally block.",
+  "rca of the issue": "N/A — no bugs found. All 10 security-hardening requirements verified end-to-end (auth/session 403 for unknown accounts, staff write RBAC, viewer read-only, settings redaction, finance guard, file tokens 15-min TTL with access-JWT rejection in ?auth=, brute-force 10-per-identifier lockout, AI quota decorator in place, deactivated user 401/403, admin team CRUD with self-guards, login ribbon removed, CORS allowlist)."
+}

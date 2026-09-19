@@ -3,6 +3,7 @@ export const extraTranslations = {
   es: {
     common: {
       new: "Nuevo",
+      phone: "Teléfono",
       edit: "Editar",
       save: "Guardar",
       saving: "Guardando…",
@@ -84,6 +85,7 @@ export const extraTranslations = {
       empty: "Aún no hay servicios registrados.",
       form: {
         type: "Tipo de servicio",
+        walk_in: "— Sin registrar (escribir nombre) —", client_name: "Nombre del cliente",
         types: {
           diagnostico: "Diagnóstico", mantenimiento: "Mantenimiento",
           afinacion: "Afinación", reparacion: "Reparación",
@@ -162,7 +164,7 @@ export const extraTranslations = {
     },
     equipo: {
       title: "Equipo y accesos", subtitle: "Solo las cuentas invitadas pueden entrar con Google.",
-      role: "Rol", invite: "Invitar", invited: "Invitación creada. Ya puede entrar con Google.", removed: "Acceso eliminado.",
+      role: "Rol", invite: "Invitar", name: "Nombre", invited: "Invitación creada. Ya puede entrar con Google.", removed: "Acceso eliminado.",
       you: "tú", pending_login: "Sin ingresar", active: "Activo", inactive: "Inactivo",
       roles: { admin: "Administrador", manager: "Gerente", technician: "Técnico", assistant: "Asistente", viewer: "Solo lectura" },
     },
@@ -216,7 +218,7 @@ export const extraTranslations = {
   },
   en: {
     common: {
-      new: "New", edit: "Edit", save: "Save", saving: "Saving…",
+      new: "New", edit: "Edit", save: "Save", saving: "Saving…", phone: "Phone",
       cancel: "Cancel", delete: "Delete", search: "Search…",
       total: "Total", subtotal: "Subtotal", tax: "Tax", status: "Status",
       folio: "Folio", date: "Date", empty: "No records", loading: "Loading…",
@@ -272,6 +274,7 @@ export const extraTranslations = {
       empty: "No services registered yet.",
       form: {
         type: "Service type",
+        walk_in: "— Not registered (type name) —", client_name: "Customer name",
         types: {
           diagnostico: "Diagnostic", mantenimiento: "Maintenance",
           afinacion: "Tune-up", reparacion: "Repair",
@@ -350,7 +353,7 @@ export const extraTranslations = {
     },
     equipo: {
       title: "Team & access", subtitle: "Only invited accounts can sign in with Google.",
-      role: "Role", invite: "Invite", invited: "Invitation created. They can now sign in with Google.", removed: "Access removed.",
+      role: "Role", invite: "Invite", name: "Name", invited: "Invitation created. They can now sign in with Google.", removed: "Access removed.",
       you: "you", pending_login: "Never signed in", active: "Active", inactive: "Inactive",
       roles: { admin: "Administrator", manager: "Manager", technician: "Technician", assistant: "Assistant", viewer: "Read only" },
     },

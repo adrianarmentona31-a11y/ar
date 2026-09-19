@@ -1006,6 +1006,8 @@ ServiceStatus = Literal[
 
 class ServiceCreate(BaseModel):
     client_id: Optional[str] = None
+    client_name: Optional[str] = ""
+    client_phone: Optional[str] = ""
     vehicle_id: Optional[str] = None
     technician_id: Optional[str] = None
     type: Optional[str] = "mantenimiento"  # diagnóstico, mantenimiento, afinación, reparación, inspección
@@ -1021,6 +1023,8 @@ class ServiceCreate(BaseModel):
 
 class ServiceUpdate(BaseModel):
     client_id: Optional[str] = None
+    client_name: Optional[str] = None
+    client_phone: Optional[str] = None
     vehicle_id: Optional[str] = None
     technician_id: Optional[str] = None
     type: Optional[str] = None
@@ -1043,6 +1047,8 @@ class ServiceOut(BaseModel):
     id: str
     folio: str
     client_id: Optional[str] = None
+    client_name: str = ""
+    client_phone: str = ""
     vehicle_id: Optional[str] = None
     technician_id: Optional[str] = None
     type: str = "mantenimiento"
@@ -1082,6 +1088,8 @@ async def create_service(body: ServiceCreate, user: dict = Depends(require_staff
         "id": str(uuid.uuid4()),
         "folio": folio,
         "client_id": body.client_id,
+        "client_name": (body.client_name or "").strip(),
+        "client_phone": (body.client_phone or "").strip(),
         "vehicle_id": body.vehicle_id,
         "technician_id": body.technician_id,
         "type": (body.type or "mantenimiento").strip(),
@@ -1138,6 +1146,9 @@ async def get_service(sid: str, user: dict = Depends(get_current_user)):
     if doc.get("client_id"):
         c = await db.clients.find_one({"id": doc["client_id"]})
         if c: s["client"] = {k: _clean_doc(c).get(k) for k in ("id","tipo","nombre","telefono","email","direccion")}
+    if not s.get("client") and (doc.get("client_name") or doc.get("client_phone")):
+        s["client"] = {"nombre": doc.get("client_name") or "", "telefono": doc.get("client_phone") or "", "email": ""}
+    s["payments"] = [{"folio": p["folio"], "date": p.get("date"), "method": p.get("method"), "amount": p.get("amount", 0)} async for p in db.payments.find({"service_id": sid}).sort("date", 1)]
     if doc.get("vehicle_id"):
         v = await db.vehicles.find_one({"id": doc["vehicle_id"]})
         if v: s["vehicle"] = {k: _clean_doc(v).get(k) for k in ("id","year","make","model","engine","vin","plates","mileage","color")}
@@ -1566,6 +1577,8 @@ async def _enrich_doc(kind: str, doc: dict) -> dict:
     if doc.get("client_id"):
         c = await db.clients.find_one({"id": doc["client_id"]})
         if c: out["client"] = {k: _clean_doc(c).get(k) for k in ("id", "tipo", "nombre", "telefono", "email", "direccion")}
+    if not out.get("client") and (doc.get("client_name") or doc.get("client_phone")):
+        out["client"] = {"nombre": doc.get("client_name") or "", "telefono": doc.get("client_phone") or "", "email": ""}
     if doc.get("vehicle_id"):
         v = await db.vehicles.find_one({"id": doc["vehicle_id"]})
         if v: out["vehicle"] = {k: _clean_doc(v).get(k) for k in ("id", "year", "make", "model", "engine", "vin", "plates", "mileage", "color")}

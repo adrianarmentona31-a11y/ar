@@ -47,7 +47,7 @@ export function TeamPanel() {
       </div>
       <form onSubmit={invite} className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_150px_auto] gap-2 items-end">
         <Field label="Email (Google)"><Input testId="team-email" type="email" value={f.email} onChange={(v) => setF((s) => ({ ...s, email: v }))} placeholder="empleado@gmail.com" /></Field>
-        <Field label={t.common.name}><Input testId="team-name" value={f.name} onChange={(v) => setF((s) => ({ ...s, name: v }))} /></Field>
+        <Field label={tr.name}><Input testId="team-name" value={f.name} onChange={(v) => setF((s) => ({ ...s, name: v }))} /></Field>
         <Field label={tr.role}><Select testId="team-role" value={f.role} onChange={(v) => setF((s) => ({ ...s, role: v }))} options={ROLES.map((r) => ({ value: r, label: tr.roles[r] }))} /></Field>
         <button type="submit" disabled={saving} className="armenta-btn-primary !w-auto !h-11 !px-4 flex items-center gap-2" data-testid="team-invite"><UserPlus size={14} />{tr.invite}</button>
       </form>

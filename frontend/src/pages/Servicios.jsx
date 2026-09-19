@@ -296,6 +296,8 @@ function ServiceForm({ initial, clients, vehicles, technicians, onClose, onSaved
     status: initial?.status || "lead",
     recommendations: initial?.recommendations || "",
     notes: initial?.notes || "",
+    client_name: initial?.client_name || "",
+    client_phone: initial?.client_phone || "",
   });
   const [items, setItems] = useState(initial?.items || []);
   const [taxRate, setTaxRate] = useState(initial?.tax_rate ?? 0.16);
@@ -319,7 +321,7 @@ function ServiceForm({ initial, clients, vehicles, technicians, onClose, onSaved
     let waWindow = null;
     if (becomesDelivered && surveyUrl) {
       const client = clients.find((c) => c.id === f.client_id);
-      waWindow = window.open(whatsappSurveyUrl({ clientName: client?.nombre, clientPhone: client?.telefono, folio: initial.folio, surveyUrl }), "_blank", "noopener");
+      waWindow = window.open(whatsappSurveyUrl({ clientName: client?.nombre || f.client_name, clientPhone: client?.telefono || f.client_phone, folio: initial.folio, surveyUrl }), "_blank", "noopener");
     }
     try {
       editing
@@ -345,8 +347,8 @@ function ServiceForm({ initial, clients, vehicles, technicians, onClose, onSaved
     <Modal title={editing ? t.servicios.edit : t.servicios.new} onClose={onClose} testId="service-form" size="xl">
       <form onSubmit={submit} className="space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <Field label={t.common.client} required>
-            <Select testId="service-client" value={f.client_id} onChange={(v) => { set("client_id")(v); set("vehicle_id")(""); }} options={[{ value: "", label: "—" }, ...clients.map((c) => ({ value: c.id, label: c.nombre }))]} />
+          <Field label={t.common.client}>
+            <Select testId="service-client" value={f.client_id} onChange={(v) => { set("client_id")(v); set("vehicle_id")(""); }} options={[{ value: "", label: t.servicios.form.walk_in }, ...clients.map((c) => ({ value: c.id, label: c.nombre }))]} />
           </Field>
           <Field label={t.common.vehicle}>
             <Select testId="service-vehicle" value={f.vehicle_id} onChange={set("vehicle_id")} options={[{ value: "", label: "—" }, ...filteredVehicles.map((v) => ({ value: v.id, label: `${v.year || ""} ${v.make} ${v.model} · ${v.plates || ""}` }))]} />
@@ -355,6 +357,12 @@ function ServiceForm({ initial, clients, vehicles, technicians, onClose, onSaved
             <Select testId="service-tech" value={f.technician_id} onChange={set("technician_id")} options={[{ value: "", label: "—" }, ...technicians.map((tc) => ({ value: tc.id, label: tc.name }))]} />
           </Field>
         </div>
+        {!f.client_id && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" data-testid="service-walkin-fields">
+            <Field label={t.servicios.form.client_name}><Input testId="service-client-name" value={f.client_name} onChange={set("client_name")} placeholder="Ej. Donato Reyes" /></Field>
+            <Field label={t.common.phone}><Input testId="service-client-phone" value={f.client_phone} onChange={set("client_phone")} placeholder="656 000 0000" /></Field>
+          </div>
+        )}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <Field label={t.servicios.form.type}><Select testId="service-type" value={f.type} onChange={set("type")} options={typeOptions} /></Field>
           <Field label={t.common.status}><Select testId="service-status" value={f.status} onChange={set("status")} options={statusOptions} /></Field>
@@ -425,7 +433,7 @@ export default function Servicios() {
     } catch (e) { toast.error(formatApiError(e)); }
   };
 
-  const clientName = (id) => clients.find((c) => c.id === id)?.nombre || "—";
+  const clientName = (s) => clients.find((c) => c.id === s.client_id)?.nombre || s.client_name || "—";
   const vehicleLabel = (id) => { const v = vehicles.find((x) => x.id === id); return v ? `${v.year || ""} ${v.make} ${v.model}`.trim() : ""; };
 
   const statusFilters = ["all", ...Object.keys(t.servicios.statuses)];
@@ -453,7 +461,7 @@ export default function Servicios() {
                 <div className="flex items-start justify-between gap-2 mb-2">
                   <div className="min-w-0">
                     <div className="font-mono-tactical text-[10px] uppercase tracking-widest text-[#dc2626]">{s.folio}</div>
-                    <div className="text-white font-semibold truncate">{clientName(s.client_id)}</div>
+                    <div className="text-white font-semibold truncate">{clientName(s)}</div>
                     <div className="text-xs text-zinc-500 truncate">{vehicleLabel(s.vehicle_id)}</div>
                   </div>
                   <StatusBadge label={t.servicios.statuses[s.status]} tone={STATUS_TONE[s.status]} />
