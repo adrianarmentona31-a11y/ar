@@ -79,6 +79,7 @@ export const translations = {
       finanzas: "Finanzas",
       tecnicos: "Técnicos",
       empresas: "Empresas",
+      encuestas: "Encuestas",
       configuracion: "Configuración",
     },
     placeholder: {
@@ -207,6 +208,7 @@ export const translations = {
       finanzas: "Finance",
       tecnicos: "Technicians",
       empresas: "Companies",
+      encuestas: "Surveys",
       configuracion: "Settings",
     },
     placeholder: {

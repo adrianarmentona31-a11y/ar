@@ -1546,9 +1546,150 @@ async def receipt_pdf(
 
 
 # ---------------------------------------------------------------------------
+# ENCUESTAS DE SATISFACCIÓN
+# ---------------------------------------------------------------------------
+import secrets as _secrets  # noqa: E402
+
+SURVEY_ASPECTS = ("puntualidad", "calidad", "precio", "comunicacion", "limpieza")
+
+
+class SurveyCreate(BaseModel):
+    service_id: str
+
+
+class SurveyAnswer(BaseModel):
+    rating: int = Field(..., ge=1, le=5)
+    nps: int = Field(..., ge=0, le=10)
+    aspects: List[str] = []
+    comments: Optional[str] = Field(default="", max_length=1000)
+    contact_ok: bool = True
+
+
+async def _survey_context(s: dict) -> dict:
+    svc = await db.services.find_one({"id": s["service_id"]}, {"_id": 0}) or {}
+    cli = await db.clients.find_one({"id": s.get("client_id")}, {"_id": 0}) or {}
+    veh = await db.vehicles.find_one({"id": svc.get("vehicle_id")}, {"_id": 0}) if svc.get("vehicle_id") else None
+    tech = await db.technicians.find_one({"id": svc.get("technician_id")}, {"_id": 0}) if svc.get("technician_id") else None
+    return {
+        "folio": svc.get("folio", ""),
+        "service_type": svc.get("type", ""),
+        "service_date": svc.get("scheduled_at") or svc.get("created_at"),
+        "client_name": cli.get("nombre", ""),
+        "client_phone": cli.get("telefono", ""),
+        "vehicle": " ".join(str(x) for x in (veh.get("year"), veh.get("make"), veh.get("model")) if x) if veh else "",
+        "technician": tech.get("name", "") if tech else "",
+    }
+
+
+def _survey_out(s: dict) -> dict:
+    s = dict(s); s.pop("_id", None)
+    return s
+
+
+@api.post("/surveys", status_code=201)
+async def create_survey(body: SurveyCreate, user: dict = Depends(get_current_user)):
+    svc = await db.services.find_one({"id": body.service_id})
+    if not svc:
+        raise HTTPException(404, "Servicio no encontrado")
+    existing = await db.surveys.find_one({"service_id": body.service_id})
+    if existing:
+        out = _survey_out(existing)
+        out.update(await _survey_context(existing))
+        return out
+    doc = {
+        "id": str(uuid.uuid4()),
+        "token": _secrets.token_urlsafe(18),
+        "service_id": body.service_id,
+        "client_id": svc.get("client_id"),
+        "status": "pending",
+        "rating": None, "nps": None, "aspects": [], "comments": "", "contact_ok": True,
+        "created_by": user["id"],
+        "created_at": now_iso(), "answered_at": None,
+    }
+    await db.surveys.insert_one(doc)
+    out = _survey_out(doc)
+    out.update(await _survey_context(doc))
+    return out
+
+
+@api.get("/surveys")
+async def list_surveys(user: dict = Depends(get_current_user), status: Optional[Literal["pending", "answered"]] = None):
+    filt = {}
+    if status: filt["status"] = status
+    docs = await db.surveys.find(filt).sort("created_at", -1).limit(300).to_list(300)
+    items = []
+    for d in docs:
+        out = _survey_out(d)
+        out.update(await _survey_context(d))
+        items.append(out)
+    answered = [d for d in docs if d.get("status") == "answered"]
+    ratings = [d["rating"] for d in answered if d.get("rating") is not None]
+    nps_vals = [d["nps"] for d in answered if d.get("nps") is not None]
+    promoters = sum(1 for n in nps_vals if n >= 9)
+    detractors = sum(1 for n in nps_vals if n <= 6)
+    aspect_counts = {a: 0 for a in SURVEY_ASPECTS}
+    for d in answered:
+        for a in d.get("aspects", []):
+            if a in aspect_counts: aspect_counts[a] += 1
+    stats = {
+        "sent": len(docs),
+        "answered": len(answered),
+        "response_rate": round(len(answered) / len(docs) * 100, 1) if docs else 0.0,
+        "avg_rating": round(sum(ratings) / len(ratings), 2) if ratings else None,
+        "nps": round((promoters - detractors) / len(nps_vals) * 100) if nps_vals else None,
+        "promoters": promoters, "detractors": detractors,
+        "passives": len(nps_vals) - promoters - detractors,
+        "aspects": aspect_counts,
+    }
+    return {"items": items, "stats": stats}
+
+
+@api.delete("/surveys/{sid}")
+async def delete_survey(sid: str, user: dict = Depends(require_role("admin", "manager"))):
+    r = await db.surveys.delete_one({"id": sid})
+    if r.deleted_count == 0: raise HTTPException(404, "Encuesta no encontrada")
+    return {"ok": True}
+
+
+@api.get("/public/surveys/{token}")
+async def public_survey(token: str):
+    s = await db.surveys.find_one({"token": token})
+    if not s: raise HTTPException(404, "Encuesta no encontrada")
+    ctx = await _survey_context(s)
+    settings = await _load_settings_dict()
+    return {
+        "status": s["status"],
+        "folio": ctx["folio"],
+        "vehicle": ctx["vehicle"],
+        "technician": ctx["technician"],
+        "service_type": ctx["service_type"],
+        "client_first_name": (ctx["client_name"] or "").split(" ")[0],
+        "company_name": settings.get("company_name", ""),
+        "aspects": list(SURVEY_ASPECTS),
+    }
+
+
+@api.post("/public/surveys/{token}/respond")
+async def public_survey_respond(token: str, body: SurveyAnswer):
+    s = await db.surveys.find_one({"token": token})
+    if not s: raise HTTPException(404, "Encuesta no encontrada")
+    if s["status"] == "answered":
+        raise HTTPException(409, "Esta encuesta ya fue respondida. ¡Gracias!")
+    aspects = [a for a in body.aspects if a in SURVEY_ASPECTS]
+    await db.surveys.update_one({"id": s["id"]}, {"$set": {
+        "status": "answered", "rating": body.rating, "nps": body.nps,
+        "aspects": aspects, "comments": (body.comments or "").strip(),
+        "contact_ok": body.contact_ok, "answered_at": now_iso(),
+    }})
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
 # Startup
 # ---------------------------------------------------------------------------
 async def ensure_indexes():
+    await db.surveys.create_index("token", unique=True)
+    await db.surveys.create_index("service_id", unique=True)
     await db.users.create_index("username", unique=True)
     await db.users.create_index("email", unique=True)
     await db.users.create_index("id", unique=True)

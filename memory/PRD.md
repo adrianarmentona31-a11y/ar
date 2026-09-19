@@ -43,6 +43,9 @@ Editable company info, tax rate, currency, footer note — feeds the receipt.
 ### Recibo de venta (COMPLETED)
 Route `/recibo/:kind/:id` (kind = cotizacion | servicio). Renders professional printable receipt on white paper with brand mark + wordmark, folio pill, client/vehicle grid, items table, totals block (subtotal, IVA, TOTAL, pagado, saldo), notes + recommendations, signature lines, footer. `@media print` rules hide chrome. Fully bilingual.
 
+### Encuestas de satisfacción (COMPLETED · 2026-09-19)
+Botón "Enviar encuesta" en el formulario de un servicio existente → crea encuesta (1 por servicio, token único), copia la liga pública `/encuesta/:token` y abre WhatsApp con mensaje prellenado al teléfono del cliente. Página pública sin login: estrellas 1-5, NPS 0-10, aspectos destacados (puntualidad, calidad, precio, comunicación, limpieza), comentario; bloquea doble respuesta (409). Módulo admin `/encuestas`: KPIs (enviadas, tasa de respuesta, calificación promedio, NPS con promotores/detractores), filtros y tarjetas con respuestas; copiar liga / WhatsApp / eliminar para pendientes. Endpoints: `POST/GET /api/surveys`, `DELETE /api/surveys/{id}`, `GET /api/public/surveys/{token}`, `POST /api/public/surveys/{token}/respond`. Archivos: `pages/Encuestas.jsx`, `pages/EncuestaPublica.jsx`, `lib/surveyLink.js`.
+
 ## Backend Endpoints
 Auth: `/api/auth/{login,me,logout}`. Clients, Companies, Vehicles, Technicians, Quotes, Services, Payments — all with POST/GET list/GET one/PATCH/DELETE. Dashboard: `/api/dashboard/summary`. Finance: `/api/finance/summary`. Settings: `/api/settings`.
 
@@ -52,9 +55,10 @@ DB: MongoDB with unique `id` indexes across every collection + folio counters co
 ✅ Seed client → seed vehicle → seed technician → create service (auto folio OS-2026-0001, total $2,238.80 with IVA, profit $1,235) → register payment (auto-updates balance) → recibo endpoint returns enriched client + vehicle + technician data → finance summary aggregates correctly → dashboard summary counts clients/vehicles/receivable.
 
 ## Next Backlog (P2/P3)
-- Phase 10 · Automatización: WhatsApp recordatorios (Twilio/Emergent), predictive kilometraje alerts, campaigns, AI insights.
-- Evidence photos on service (fal.ai or object storage).
-- PDF export of the receipt using server-side rendering (currently uses browser print).
+- P1 Compresión de fotos (máx 1600px) al subir evidencias.
+- P1 Envío de recibo PDF por email (Resend vía integration playbook).
+- P2 Recordatorios de kilometraje (cron 6 meses / 10,000 km) + WhatsApp automatizado.
+- P2 Envío automático de encuesta al marcar servicio como "entregado".
 - RFC-grouped fleet consolidation view.
 - Splash screen with hex animation.
 

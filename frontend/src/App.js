@@ -26,6 +26,8 @@ import Tecnicos from "@/pages/Tecnicos";
 import Empresas from "@/pages/Empresas";
 import Configuracion from "@/pages/Configuracion";
 import Recibo from "@/pages/Recibo";
+import Encuestas from "@/pages/Encuestas";
+import EncuestaPublica from "@/pages/EncuestaPublica";
 
 function ProtectedShell({ children }) {
   return (
@@ -47,6 +49,7 @@ const ROUTES = [
   { path: "/empresas", el: <Empresas /> },
   { path: "/configuracion", el: <Configuracion /> },
   { path: "/recibo/:kind/:id", el: <Recibo /> },
+  { path: "/encuestas", el: <Encuestas /> },
 ];
 
 export default function App() {
@@ -57,6 +60,7 @@ export default function App() {
           <BrowserRouter>
             <Routes>
               <Route path="/login" element={<Login />} />
+              <Route path="/encuesta/:token" element={<EncuestaPublica />} />
               {ROUTES.map((r) => (
                 <Route key={r.path} path={r.path} element={<ProtectedShell>{r.el}</ProtectedShell>} />
               ))}
