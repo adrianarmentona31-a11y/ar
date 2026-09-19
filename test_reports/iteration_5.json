@@ -1,0 +1,36 @@
+{
+  "summary": "ARMENTA OS Iteration 5 tested: (A) walk-in services, (B) 1-page PDFs, (C) public share links, (D) branded recibo header. Backend 14/14 PASS in test_iter5_walkin_share_pdf.py (walk-in create/patch/get with client{nombre,telefono} built from client_name/client_phone; PDF for servicio/cotizacion/nota/pago each 1 page; share-link 200 returns path starting /api/public/receipts/{kind}/, url and expires_at; public PDF fetch WITHOUT auth returns application/pdf 200; tampered token → 401; missing ?t → 422; share-link works for pago/nota; viewer role can also read share-link; viewer 403 on POST /services and GET /finance/summary). Frontend: /recibo/servicio/{id} renders branded header (BrandMark + wordmark + folio pill) with 'ORDEN DE SERVICIO' and 'EMITIDO PARA Cliente Prueba UI'; 1 share-btn on toolbar → share-menu opens with share-whatsapp/share-messenger/share-copy; share-copy triggers 'Liga copiada' toast; /notas shows 5 compact share-btn; /cobros rows show 3 compact share-btn and share-menu opens. Login page: NO 'Servicio a domicilio' ribbon, no data-testid login-ribbon (regression clean). Walk-in service card in /servicios shows the free-text client name.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "ServiceForm (Servicios.jsx line 288)", "issue": "On new service, client_id defaults to `clients[0]?.id || \"\"` — the FIRST registered client is preselected instead of the walk-in option. The task spec says 'leave client select at Sin registrar → service-walkin-fields visible', but user must manually pick the empty option first. Same bug on EDIT of a walk-in service (client_id is null → falls back to first client), so service-walkin-fields is hidden and service-client-name is NOT prefilled when re-opening a saved walk-in service. This directly fails the assertion 'open it → service-client-name prefilled'.", "selector": "[data-testid=\"service-form\"] select (Cliente)", "priority": "HIGH"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter5_walkin_share_pdf.py",
+    "/app/test_reports/pytest/iter5_results.xml"
+  ],
+  "action_items": [
+    "Fix Servicios.jsx line 288 initial client_id default. Change `client_id: initial?.client_id || clients[0]?.id || \"\"` to `client_id: initial?.client_id ?? \"\"` (or explicit empty string) so walk-in mode is the default when no client_id is set on the record. This unblocks 'Sin registrar' being the initial selection on Nuevo servicio AND preserves walk-in mode when re-opening a saved walk-in service (so service-walkin-fields and its prefilled name/phone show)."
+  ],
+  "critical_code_review_comments": [
+    "Servicios.jsx line 288 uses `||` fallback which treats empty string as falsy and injects first client id — should use `??` or drop the fallback entirely.",
+    "ShareReceipt.jsx: `getLink` memoizes a fresh URL on first click but if the JWT expires (30 days later while the tab is still open) it will keep using the stale one — consider invalidating after some window or on 401.",
+    "public_receipt_pdf (server.py ~1634): missing token defaults to 422 due to `t: str = Query(...)` — task spec says 'missing token → 401'. Consider `Optional[str] = None` + explicit 401 to match spec. Currently returns FastAPI validation 422 (my test accepted either).",
+    "receipt_share_link (server.py ~1614) regenerates the whole PDF just to fetch the folio — wasteful. Consider a helper that returns folio only (query DB once) instead of `_receipt_pdf_bytes` (which invokes build_receipt_pdf).",
+    "server.py grew to 2064 lines — still recommended to split by domain (auth/services/receipts/payments/etc).",
+    "The client dropdown label 'Cliente sin nombre' overlaps confusingly with the walk-in placeholder — makes the preselect-bug harder to notice visually."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter5_walkin_share_pdf.py"
+  ],
+  "success_rate": {"backend": "100% (14/14)", "frontend": "~85% (share flow + PDFs + branded recibo all OK; new/edit walk-in default selection bug)"},
+  "test_credentials": "admin/armenta123 and viewer/viewer123 — both working",
+  "seed_data_creation": "Created several walk-in test services, quotes, notes, and payments for share-link and PDF-page-count tests. They remain in DB but are prefixed with client_name='Cliente Prueba UI'/'Share Test'/etc. Consider cleanup if collections grow large.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iteration 5 backend test at /app/backend/tests/test_iter5_walkin_share_pdf.py — 14 tests, all PASS. Run with `python -m pytest backend/tests/test_iter5_walkin_share_pdf.py -v -o addopts=''` (must override addopts since backend/pytest.ini uses xdist). Login endpoint expects `identifier` (not `username`). Payment `method` accepts only cash/transfer/card/other. Public receipt endpoint returns 401 on tampered JWT and 422 (fastapi validation) when ?t missing entirely (spec said 401 but validation runs first). Known frontend bug: Servicios ServiceForm initial state seeds client_id with clients[0]?.id — needs fix per action_items.",
+  "rca of the issue": "Servicios.jsx `client_id: initial?.client_id || clients[0]?.id || \"\"` — the `||` chain returns the first truthy value; when both initial.client_id and empty string are considered, undefined/null falls through to clients[0].id. Impact: (1) creating a new service auto-selects the first registered client so walk-in fields are hidden by default, forcing the user to change the dropdown. (2) When editing an existing walk-in service (whose stored client_id is null), the same fallback re-selects the first client, so the previously-stored client_name/client_phone become invisible in the form. Fix: `client_id: initial?.client_id ?? \"\"`."
+}
