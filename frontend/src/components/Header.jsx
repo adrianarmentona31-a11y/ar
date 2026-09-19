@@ -30,7 +30,7 @@ export function Header() {
     >
       <div className="max-w-7xl mx-auto flex items-center justify-between px-4 sm:px-6 h-16">
         <div className="flex items-center gap-3">
-          <BrandMark size={36} />
+          <BrandMark size={40} />
           <div className="flex flex-col leading-tight">
             <span className="font-display uppercase text-[15px] tracking-wider text-white">
               ARMENTA <span className="text-[#dc2626]">OS</span>

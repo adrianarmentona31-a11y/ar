@@ -20,15 +20,48 @@ export function AuthProvider({ children }) {
   const [status, setStatus] = useState("initializing");
   const [session, setSession] = useState(null);
 
-  // Rehydrate from localStorage on mount, then verify with /auth/me.
+  // Rehydrate from localStorage OR handle Emergent Google session_id fragment.
+  // REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
   useEffect(() => {
     let cancelled = false;
+
+    async function processGoogleCallback(sessionId) {
+      try {
+        const { data } = await api.post(
+          "/auth/session",
+          null,
+          { headers: { "X-Session-ID": sessionId } },
+        );
+        if (cancelled) return;
+        // Clean the hash so we don't re-trigger on rerender
+        const cleanUrl = window.location.pathname + window.location.search;
+        window.history.replaceState(null, "", cleanUrl);
+        const sess = {
+          user: data.user,
+          session_started_at: data.session_started_at,
+          cookie_auth: true, // no Bearer token — auth runs via httpOnly cookie
+        };
+        storage.set(STORAGE_KEYS.session, sess);
+        setSession(sess);
+        setStatus("authenticated");
+      } catch (e) {
+        if (cancelled) return;
+        storage.remove(STORAGE_KEYS.session);
+        setSession(null);
+        setStatus("anonymous");
+      }
+    }
+
     async function bootstrap() {
+      const hash = window.location.hash || "";
+      const match = hash.match(/session_id=([^&]+)/);
+      if (match) {
+        return processGoogleCallback(match[1]);
+      }
       const stored = storage.get(STORAGE_KEYS.session);
-      if (!stored?.token) {
-        if (!cancelled) {
-          setStatus("anonymous");
-        }
+      // If we have either a Bearer token OR a stored cookie session, verify with /auth/me
+      if (!stored) {
+        if (!cancelled) setStatus("anonymous");
         return;
       }
       try {

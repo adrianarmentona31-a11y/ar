@@ -1,22 +1,23 @@
 """ARMENTA OS — Server-side PDF receipt renderer.
 
-Builds a professional printable A4 receipt using ReportLab primitives.
-Faithful to the on-screen design: chrome oval + red car silhouette wordmark,
-hex "A" brand mark, red folio pill, itemized table, totals block with
-red-accented grand total, signature lines and footer.
+Uses the official ARMENTA'S MOTORS brand assets (hex-A brand mark + primary
+wordmark) rendered as embedded raster images, plus a red folio pill,
+itemized table, totals block, signature lines and footer.
 """
 from datetime import datetime
 from io import BytesIO
+from pathlib import Path
 from typing import Optional
 
 from reportlab.lib import colors
-from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 from reportlab.lib.pagesizes import LETTER
-from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont  # noqa: F401 (kept for future custom fonts)
+from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
+
+ASSETS_DIR = Path(__file__).parent / "assets"
+WORDMARK_PATH = ASSETS_DIR / "armenta_wordmark.png"
+HEX_PATH = ASSETS_DIR / "armenta_hex.png"
 
 # Palette (aligned with UI)
 BG_WHITE = colors.HexColor("#ffffff")
@@ -25,8 +26,6 @@ INK_SOFT = colors.HexColor("#27272a")
 MUTED = colors.HexColor("#71717a")
 LIGHT = colors.HexColor("#a1a1aa")
 RULE = colors.HexColor("#e4e4e7")
-CHROME_DARK = colors.HexColor("#3f3f46")
-CHROME = colors.HexColor("#a1a1aa")
 RED = colors.HexColor("#dc2626")
 RED_DARK = colors.HexColor("#991b1b")
 RED_TINT = colors.HexColor("#fef2f2")
@@ -54,107 +53,29 @@ def _fmt_date(iso: Optional[str]) -> str:
 
 
 def _draw_hex_mark(c: canvas.Canvas, cx: float, cy: float, r: float):
-    """Hexagonal brand mark: red rim + obsidian body + silver A."""
-    import math
-    outer = []
-    inner = []
-    for i in range(6):
-        theta = math.radians(-90 + 60 * i)
-        outer.append((cx + r * math.cos(theta), cy + r * math.sin(theta)))
-        rr = r * 0.86
-        inner.append((cx + rr * math.cos(theta), cy + rr * math.sin(theta)))
-
-    # Outer red hex
-    c.setFillColor(RED)
-    p = c.beginPath()
-    p.moveTo(*outer[0])
-    for pt in outer[1:]:
-        p.lineTo(*pt)
-    p.close()
-    c.drawPath(p, stroke=0, fill=1)
-
-    # Inner obsidian body
-    c.setFillColor(INK)
-    p2 = c.beginPath()
-    p2.moveTo(*inner[0])
-    for pt in inner[1:]:
-        p2.lineTo(*pt)
-    p2.close()
-    c.drawPath(p2, stroke=0, fill=1)
-
-    # A monogram (chrome silver)
-    c.setFillColor(CHROME)
-    ap = c.beginPath()
-    ap.moveTo(cx, cy + r * 0.42)             # peak
-    ap.lineTo(cx + r * 0.42, cy - r * 0.48)  # bottom right
-    ap.lineTo(cx + r * 0.26, cy - r * 0.48)
-    ap.lineTo(cx + r * 0.16, cy - r * 0.20)
-    ap.lineTo(cx - r * 0.16, cy - r * 0.20)
-    ap.lineTo(cx - r * 0.26, cy - r * 0.48)
-    ap.lineTo(cx - r * 0.42, cy - r * 0.48)
-    ap.close()
-    c.drawPath(ap, stroke=0, fill=1)
-
-    # inner red slot
-    c.setFillColor(RED)
-    sp = c.beginPath()
-    sp.moveTo(cx - r * 0.09, cy - r * 0.03)
-    sp.lineTo(cx + r * 0.09, cy - r * 0.03)
-    sp.lineTo(cx, cy + r * 0.22)
-    sp.close()
-    c.drawPath(sp, stroke=0, fill=1)
+    """Draw the official hex-A brand mark image centered at (cx, cy)."""
+    try:
+        img = ImageReader(str(HEX_PATH))
+        size = r * 2
+        c.drawImage(img, cx - r, cy - r, width=size, height=size, mask="auto")
+    except Exception:
+        # Fallback: solid red hex if asset is missing
+        c.setFillColor(RED)
+        c.circle(cx, cy, r, stroke=0, fill=1)
 
 
 def _draw_wordmark(c: canvas.Canvas, x: float, y: float, width: float = 62 * mm):
-    """Chrome oval + red car silhouette + ARMENTA'S / MOTORS."""
-    h = width * 0.42
-    cx = x + width / 2
-    cy = y + h / 2
-
-    # Oval outline (chrome)
-    c.setStrokeColor(CHROME_DARK)
-    c.setLineWidth(1.4)
-    c.ellipse(x, y, x + width, y + h, stroke=1, fill=0)
-    c.setStrokeColor(CHROME)
-    c.setLineWidth(0.6)
-    c.ellipse(x + 1.2, y + 1.2, x + width - 1.2, y + h - 1.2, stroke=1, fill=0)
-
-    # Red car silhouette (top curve inside oval)
-    c.setFillColor(RED)
-    car = c.beginPath()
-    car.moveTo(x + width * 0.20, cy + h * 0.18)
-    car.curveTo(
-        x + width * 0.28, cy + h * 0.42,
-        x + width * 0.42, cy + h * 0.50,
-        x + width * 0.50, cy + h * 0.50,
-    )
-    car.curveTo(
-        x + width * 0.58, cy + h * 0.50,
-        x + width * 0.72, cy + h * 0.42,
-        x + width * 0.80, cy + h * 0.18,
-    )
-    car.curveTo(
-        x + width * 0.72, cy + h * 0.28,
-        x + width * 0.62, cy + h * 0.32,
-        x + width * 0.50, cy + h * 0.32,
-    )
-    car.curveTo(
-        x + width * 0.38, cy + h * 0.32,
-        x + width * 0.28, cy + h * 0.28,
-        x + width * 0.20, cy + h * 0.18,
-    )
-    car.close()
-    c.drawPath(car, stroke=0, fill=1)
-
-    # ARMENTA'S wordmark
-    c.setFillColor(INK)
-    c.setFont("Helvetica-Bold", width * 0.14)
-    c.drawCentredString(cx, cy - h * 0.05, "ARMENTA'S")
-
-    # MOTORS tagline (red)
-    c.setFillColor(RED)
-    c.setFont("Helvetica-Bold", width * 0.058)
-    c.drawCentredString(cx, cy - h * 0.30, "M O T O R S")
+    """Draw the official ARMENTA'S / MOTORS primary logo at (x, y) top-left anchor."""
+    try:
+        img = ImageReader(str(WORDMARK_PATH))
+        iw, ih = img.getSize()
+        aspect = ih / iw
+        height = width * aspect
+        c.drawImage(img, x, y - height, width=width, height=height, mask="auto")
+    except Exception:
+        c.setFillColor(INK)
+        c.setFont("Helvetica-Bold", 14)
+        c.drawString(x, y - 8 * mm, "ARMENTA'S MOTORS")
 
 
 def build_receipt_pdf(doc: dict, settings: dict, kind: str = "servicio") -> bytes:
@@ -170,13 +91,13 @@ def build_receipt_pdf(doc: dict, settings: dict, kind: str = "servicio") -> byte
     currency = (settings or {}).get("currency") or "MXN"
 
     # ------------------- Header -------------------
-    _draw_hex_mark(c, x + 10 * mm, y - 6 * mm, 10 * mm)
-    _draw_wordmark(c, x + 24 * mm, y - 14 * mm, width=62 * mm)
+    _draw_hex_mark(c, x + 10 * mm, y - 10 * mm, 10 * mm)
+    _draw_wordmark(c, x + 24 * mm, y - 2 * mm, width=58 * mm)
 
     # Company meta
     c.setFillColor(MUTED)
     c.setFont("Helvetica", 7.5)
-    meta_y = y - 18 * mm
+    meta_y = y - 26 * mm
     for line in [
         settings.get("company_address"),
         f"Tel. {settings.get('company_phone')}" if settings.get("company_phone") else None,

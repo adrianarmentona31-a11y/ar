@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Plus, Trash2, Wrench, Receipt as ReceiptIcon } from "lucide-react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Plus, Trash2, Wrench, Receipt as ReceiptIcon, Upload, Image as ImageIcon, X } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import { api, formatApiError } from "../lib/api";
@@ -12,6 +12,87 @@ const STATUS_TONE = {
   scheduled: "amber", in_progress: "amber", completed: "green",
   delivered: "green", cancelled: "red",
 };
+
+function ServicePhotos({ serviceId }) {
+  const { t } = useI18n();
+  const [items, setItems] = useState([]);
+  const [uploading, setUploading] = useState(false);
+  const inputRef = useRef(null);
+
+  const load = useCallback(async () => {
+    if (!serviceId) return;
+    try {
+      const { data } = await api.get("/files", { params: { service_id: serviceId } });
+      setItems(data.items || []);
+    } catch (e) { /* ignore */ }
+  }, [serviceId]);
+  useEffect(() => { load(); }, [load]);
+
+  const onFiles = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    setUploading(true);
+    for (const file of files) {
+      const fd = new FormData();
+      fd.append("file", file);
+      try {
+        await api.post("/files/upload", fd, {
+          params: { service_id: serviceId },
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+      } catch (err) {
+        toast.error(formatApiError(err));
+      }
+    }
+    setUploading(false);
+    if (inputRef.current) inputRef.current.value = "";
+    load();
+  };
+
+  const remove = async (id) => {
+    if (!window.confirm(t.common.delete_confirm)) return;
+    try { await api.delete(`/files/${id}`); load(); }
+    catch (e) { toast.error(formatApiError(e)); }
+  };
+
+  const token = (() => { try { return JSON.parse(localStorage.getItem("armenta_os_session_v1") || "{}").token || ""; } catch { return ""; } })();
+  const src = (id) => `${process.env.REACT_APP_BACKEND_URL}/api/files/${id}/download${token ? `?auth=${encodeURIComponent(token)}` : ""}`;
+
+  return (
+    <div className="pt-2 border-t border-[#1a1a1a]">
+      <div className="flex items-center justify-between mb-3">
+        <label className="text-[11px] uppercase tracking-widest font-mono-tactical text-zinc-500 flex items-center gap-2">
+          <ImageIcon size={13} className="text-[#dc2626]" /> Evidencias
+        </label>
+        <label className="armenta-btn-ghost !h-9 !px-3 flex items-center gap-2 cursor-pointer" data-testid="photos-upload-btn">
+          <Upload size={13} />
+          {uploading ? "Subiendo…" : "Subir foto"}
+          <input ref={inputRef} type="file" accept="image/*,application/pdf" multiple className="hidden" onChange={onFiles} data-testid="photos-input" />
+        </label>
+      </div>
+      {items.length === 0 ? (
+        <div className="text-xs text-zinc-600 py-3 text-center border border-dashed border-[#262626] rounded-lg">
+          Sin fotos de evidencia todavía
+        </div>
+      ) : (
+        <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+          {items.map((f) => (
+            <div key={f.id} className="relative group aspect-square rounded-lg overflow-hidden border border-[#262626] bg-[#0d0d0d]">
+              {f.content_type?.startsWith("image/") ? (
+                <img src={src(f.id)} alt={f.original_filename} className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-xs text-zinc-500 p-2 text-center">{f.original_filename}</div>
+              )}
+              <button type="button" onClick={() => remove(f.id)} className="absolute top-1 right-1 bg-black/70 hover:bg-red-900 text-white rounded p-1 opacity-0 group-hover:opacity-100 transition-opacity" data-testid={`photo-rm-${f.id}`}>
+                <X size={12} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function ItemsEditor({ items, setItems, taxRate, setTaxRate }) {
   const { t } = useI18n();
@@ -140,6 +221,7 @@ function ServiceForm({ initial, clients, vehicles, technicians, onClose, onSaved
         <div className="pt-2 border-t border-[#1a1a1a]">
           <ItemsEditor items={items} setItems={setItems} taxRate={taxRate} setTaxRate={setTaxRate} />
         </div>
+        {editing && <ServicePhotos serviceId={initial.id} />}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Field label={t.servicios.form.recommendations}><Textarea testId="service-reco" value={f.recommendations} onChange={set("recommendations")} rows={2} /></Field>
           <Field label={t.common.description}><Textarea testId="service-notes" value={f.notes} onChange={set("notes")} rows={2} /></Field>

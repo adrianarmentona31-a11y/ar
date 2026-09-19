@@ -108,8 +108,8 @@ export default function Recibo() {
       <div id="receipt-paper" className="receipt-paper" data-testid="recibo-paper">
         {/* Header */}
         <div className="receipt-header">
-          <div className="flex items-center gap-4">
-            <BrandMark size={56} />
+          <div className="flex items-center gap-5">
+            <BrandMark size={72} />
             <div>
               <ArmentaWordmark width={220} />
               <div className="receipt-meta">

@@ -7,9 +7,11 @@ export const API_BASE = `${BACKEND_URL}/api`;
 export const api = axios.create({
   baseURL: API_BASE,
   timeout: 15000,
+  withCredentials: true, // include cookies for Emergent Google session
 });
 
-// Attach bearer token when we have a session
+// Attach bearer token when we have a session (custom JWT flow).
+// Cookie-based Google session works automatically via withCredentials.
 api.interceptors.request.use((config) => {
   const session = storage.get(STORAGE_KEYS.session);
   if (session?.token) {

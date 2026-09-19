@@ -7,6 +7,12 @@ import { useI18n } from "../context/I18nContext";
 import { BrandMark } from "../components/BrandMark";
 import { ArmentaWordmark } from "../components/ArmentaWordmark";
 
+// REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
+function startGoogleSignIn() {
+  const redirectUrl = window.location.origin + "/control";
+  window.location.href = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`;
+}
+
 export default function Login() {
   const { login, isAuthenticated, isInitializing } = useAuth();
   const { t, locale, toggle } = useI18n();
@@ -61,9 +67,9 @@ export default function Login() {
 
         <div className="w-full max-w-md">
           <div className="flex flex-col items-center mb-8">
-            <BrandMark size={68} glow className="mb-4" />
-            <ArmentaWordmark width={280} className="mb-1" />
-            <p className="text-xs text-zinc-500 mt-1 font-mono-tactical tracking-[0.28em] uppercase">
+            <BrandMark size={88} glow className="mb-4" />
+            <ArmentaWordmark width={300} className="mb-1" />
+            <p className="text-xs text-zinc-500 mt-2 font-mono-tactical tracking-[0.28em] uppercase">
               {t.brand.tagline}
             </p>
           </div>
@@ -158,6 +164,32 @@ export default function Login() {
                 ) : (
                   <span>{t.login.submit}</span>
                 )}
+              </button>
+
+              {/* Google Sign-In (Emergent managed) */}
+              <div className="relative py-1">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-[#1f1f1f]" />
+                </div>
+                <div className="relative flex justify-center text-[10px] uppercase tracking-widest font-mono-tactical text-zinc-600">
+                  <span className="bg-[#101010] px-3">{t.login.or}</span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={startGoogleSignIn}
+                disabled={submitting}
+                className="w-full h-12 rounded-lg border border-[#262626] bg-[#0d0d0d] hover:bg-[#141414] hover:border-[#3a3a3a] text-white flex items-center justify-center gap-3 transition-colors font-medium text-sm"
+                data-testid="login-google-button"
+              >
+                <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
+                  <path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.3l6.7-6.7C35.6 2.4 30.2 0 24 0 14.7 0 6.7 5.3 2.8 13l7.9 6.1C12.6 12.9 17.8 9.5 24 9.5z" />
+                  <path fill="#4285F4" d="M46.5 24.6c0-1.6-.1-3.1-.4-4.6H24v9.3h12.7c-.6 3-2.3 5.6-4.8 7.3l7.4 5.8c4.4-4 6.9-9.9 6.9-17.8z" />
+                  <path fill="#FBBC05" d="M10.7 28.6c-.5-1.5-.8-3-.8-4.6s.3-3.1.8-4.6l-7.9-6.1C1.1 16.8 0 20.3 0 24s1.1 7.2 2.8 10.7l7.9-6.1z" />
+                  <path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.4-5.8c-2.1 1.4-4.8 2.2-8.5 2.2-6.2 0-11.4-3.4-13.3-8.6l-7.9 6.1C6.7 42.7 14.7 48 24 48z" />
+                </svg>
+                {t.login.google}
               </button>
             </form>
 

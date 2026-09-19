@@ -26,6 +26,8 @@ export const translations = {
         network: "No se pudo conectar con el servidor.",
       },
       footer: "Uso restringido a personal autorizado de ARMENTA'S MOTORS.",
+      or: "o continúa con",
+      google: "Continuar con Google",
     },
     header: {
       session_active: "SESIÓN ACTIVA",
@@ -152,6 +154,8 @@ export const translations = {
         network: "Unable to reach the server.",
       },
       footer: "Restricted to authorized ARMENTA'S MOTORS personnel.",
+      or: "or continue with",
+      google: "Continue with Google",
     },
     header: {
       session_active: "SESSION ACTIVE",

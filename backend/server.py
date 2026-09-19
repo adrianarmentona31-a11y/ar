@@ -11,15 +11,16 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional, Literal, List
 
 import bcrypt
+import httpx
 import jwt
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request
-from fastapi.responses import Response
+from fastapi.responses import Response, JSONResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field, EmailStr, ConfigDict
 
-from pdf_receipt import build_receipt_pdf
+from pdf_receipt import build_receipt_pdf, ASSETS_DIR  # noqa: F401
 
 # ---------------------------------------------------------------------------
 # Config
@@ -85,23 +86,43 @@ async def get_current_user(
     request: Request,
     creds: Optional[HTTPAuthorizationCredentials] = Depends(security),
 ) -> dict:
+    # 1) Bearer JWT (existing custom auth)
     token = creds.credentials if creds and creds.scheme.lower() == "bearer" else None
-    if not token:
-        raise HTTPException(status_code=401, detail="No autenticado")
-    try:
-        payload = jwt.decode(token, get_jwt_secret(), algorithms=[JWT_ALGORITHM])
-        if payload.get("type") != "access":
+    if token:
+        try:
+            payload = jwt.decode(token, get_jwt_secret(), algorithms=[JWT_ALGORITHM])
+            if payload.get("type") != "access":
+                raise HTTPException(status_code=401, detail="Token inválido")
+            user = await db.users.find_one({"id": payload["sub"]}, {"_id": 0})
+            if not user:
+                raise HTTPException(status_code=401, detail="Usuario no encontrado")
+            user.pop("password_hash", None)
+            return user
+        except jwt.ExpiredSignatureError:
+            raise HTTPException(status_code=401, detail="Sesión expirada")
+        except jwt.InvalidTokenError:
             raise HTTPException(status_code=401, detail="Token inválido")
-        user = await db.users.find_one({"id": payload["sub"]})
+
+    # 2) session_token cookie (Emergent Google auth)
+    cookie_token = request.cookies.get("session_token")
+    if cookie_token:
+        sess = await db.user_sessions.find_one({"session_token": cookie_token}, {"_id": 0})
+        if not sess:
+            raise HTTPException(status_code=401, detail="Sesión inválida")
+        expires_at = sess.get("expires_at")
+        if isinstance(expires_at, str):
+            expires_at = datetime.fromisoformat(expires_at)
+        if isinstance(expires_at, datetime) and expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        if expires_at and expires_at < now_dt():
+            raise HTTPException(status_code=401, detail="Sesión expirada")
+        user = await db.users.find_one({"id": sess["user_id"]}, {"_id": 0})
         if not user:
             raise HTTPException(status_code=401, detail="Usuario no encontrado")
-        user.pop("_id", None)
         user.pop("password_hash", None)
         return user
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Sesión expirada")
-    except jwt.InvalidTokenError:
-        raise HTTPException(status_code=401, detail="Token inválido")
+
+    raise HTTPException(status_code=401, detail="No autenticado")
 
 
 def require_role(*roles: str):
@@ -182,7 +203,206 @@ async def me(user: dict = Depends(get_current_user)):
 
 
 @api.post("/auth/logout")
-async def logout(user: dict = Depends(get_current_user)):
+async def logout(request: Request, user: dict = Depends(get_current_user)):
+    cookie_token = request.cookies.get("session_token")
+    resp = JSONResponse({"ok": True})
+    if cookie_token:
+        await db.user_sessions.delete_one({"session_token": cookie_token})
+        resp.delete_cookie("session_token", path="/")
+    return resp
+
+
+# --- Emergent-managed Google Sign-In ---
+# REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
+@api.post("/auth/session")
+async def google_session_exchange(request: Request):
+    session_id = request.headers.get("X-Session-ID")
+    if not session_id:
+        try:
+            body = await request.json()
+            session_id = (body or {}).get("session_id")
+        except Exception:
+            session_id = None
+    if not session_id:
+        raise HTTPException(status_code=400, detail="Falta session_id")
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as http:
+            r = await http.get(
+                "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data",
+                headers={"X-Session-ID": session_id},
+            )
+    except Exception as exc:
+        logger.exception("emergent-auth call failed: %s", exc)
+        raise HTTPException(status_code=502, detail="No se pudo contactar al proveedor de autenticación")
+    if r.status_code != 200:
+        raise HTTPException(status_code=401, detail="Sesión de Google inválida")
+    data = r.json() or {}
+    email = (data.get("email") or "").strip().lower()
+    if not email:
+        raise HTTPException(status_code=400, detail="Google no devolvió correo")
+    name = data.get("name") or email
+    picture = data.get("picture") or ""
+    session_token = data.get("session_token")
+    if not session_token:
+        raise HTTPException(status_code=502, detail="Respuesta de Google incompleta")
+    admin_email = os.environ.get("ADMIN_EMAIL", "").strip().lower()
+    user_doc = await db.users.find_one({"email": email})
+    if user_doc is None:
+        user_doc = {
+            "id": str(uuid.uuid4()),
+            "username": email, "email": email, "name": name,
+            "role": "admin" if email == admin_email else "viewer",
+            "picture": picture, "google_linked": True,
+            "created_at": now_iso(), "last_login_at": now_iso(),
+        }
+        await db.users.insert_one(user_doc)
+    else:
+        await db.users.update_one(
+            {"id": user_doc["id"]},
+            {"$set": {"name": name, "picture": picture, "google_linked": True, "last_login_at": now_iso()}},
+        )
+        user_doc.update({"name": name, "picture": picture})
+    expires_at = now_dt() + timedelta(days=7)
+    await db.user_sessions.insert_one({
+        "session_token": session_token, "user_id": user_doc["id"],
+        "expires_at": expires_at.isoformat(), "created_at": now_iso(),
+    })
+    resp = JSONResponse({
+        "user": {
+            "id": user_doc["id"],
+            "username": user_doc.get("username", email),
+            "email": email, "name": user_doc.get("name", name),
+            "role": user_doc.get("role", "viewer"),
+            "picture": user_doc.get("picture", picture),
+        },
+        "session_started_at": now_iso(),
+    })
+    resp.set_cookie(
+        key="session_token", value=session_token,
+        httponly=True, secure=True, samesite="none",
+        max_age=7 * 24 * 3600, path="/",
+    )
+    return resp
+
+
+# ---------------------------------------------------------------------------
+# FILE & MEDIA STORAGE (Emergent object storage)
+# ---------------------------------------------------------------------------
+import mimetypes as _mimetypes
+from fastapi import UploadFile, File as FastFile, Query, Header  # noqa: E402
+from storage import init_storage, put_object, get_object  # noqa: E402
+
+
+class FileOut(BaseModel):
+    id: str
+    storage_path: str
+    original_filename: str
+    content_type: str
+    size: int
+    service_id: Optional[str] = None
+    created_at: datetime
+
+
+@api.post("/files/upload", response_model=FileOut, status_code=201)
+async def upload_file(
+    file: UploadFile = FastFile(...),
+    service_id: Optional[str] = None,
+    user: dict = Depends(get_current_user),
+):
+    max_bytes = 12 * 1024 * 1024  # 12 MB
+    data = await file.read()
+    if len(data) > max_bytes:
+        raise HTTPException(status_code=413, detail="Archivo demasiado grande (máx 12 MB)")
+    ext = (file.filename or "bin").rsplit(".", 1)[-1].lower()
+    if ext not in {"jpg", "jpeg", "png", "webp", "gif", "pdf"}:
+        raise HTTPException(status_code=400, detail="Tipo de archivo no permitido")
+    content_type = file.content_type or _mimetypes.guess_type(file.filename or "")[0] or "application/octet-stream"
+    file_id = str(uuid.uuid4())
+    path = f"armenta-os/uploads/{user['id']}/{file_id}.{ext}"
+    try:
+        result = put_object(path, data, content_type)
+    except Exception as exc:
+        logger.exception("upload failed: %s", exc)
+        raise HTTPException(status_code=502, detail="No se pudo guardar el archivo")
+    doc = {
+        "id": file_id,
+        "storage_path": result["path"],
+        "original_filename": file.filename or f"{file_id}.{ext}",
+        "content_type": content_type,
+        "size": result.get("size", len(data)),
+        "service_id": service_id,
+        "uploaded_by": user["id"],
+        "is_deleted": False,
+        "created_at": now_iso(),
+    }
+    await db.files.insert_one(doc)
+    if service_id:
+        await db.services.update_one(
+            {"id": service_id},
+            {"$addToSet": {"photos": file_id}, "$set": {"updated_at": now_iso()}},
+        )
+    return FileOut(**_clean_doc(doc))
+
+
+@api.get("/files")
+async def list_files(user: dict = Depends(get_current_user), service_id: Optional[str] = None):
+    filt = {"is_deleted": False}
+    if service_id:
+        filt["service_id"] = service_id
+    docs = await db.files.find(filt).sort("created_at", -1).limit(200).to_list(200)
+    return {"items": [FileOut(**_clean_doc(d)).model_dump() for d in docs]}
+
+
+@api.get("/files/{file_id}/download")
+async def download_file(
+    file_id: str,
+    request: Request,
+    creds: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    auth: Optional[str] = Query(None, description="Bearer token via query for <img> src"),
+):
+    # Support <img src="...?auth=TOKEN"> since <img> can't send headers
+    if not (creds and creds.scheme.lower() == "bearer") and auth:
+        request._headers = None  # noqa - just guard
+    # Re-run auth resolution manually so we can accept the query token too
+    token = creds.credentials if creds and creds.scheme.lower() == "bearer" else auth
+    if token:
+        try:
+            payload = jwt.decode(token, get_jwt_secret(), algorithms=[JWT_ALGORITHM])
+            if payload.get("type") != "access":
+                raise HTTPException(status_code=401, detail="Token inválido")
+            if not await db.users.find_one({"id": payload["sub"]}, {"_id": 1}):
+                raise HTTPException(status_code=401, detail="Usuario no encontrado")
+        except jwt.PyJWTError:
+            raise HTTPException(status_code=401, detail="Token inválido")
+    else:
+        cookie_token = request.cookies.get("session_token")
+        if not cookie_token:
+            raise HTTPException(status_code=401, detail="No autenticado")
+        sess = await db.user_sessions.find_one({"session_token": cookie_token})
+        if not sess:
+            raise HTTPException(status_code=401, detail="Sesión inválida")
+    record = await db.files.find_one({"id": file_id, "is_deleted": False}, {"_id": 0})
+    if not record:
+        raise HTTPException(status_code=404, detail="Archivo no encontrado")
+    try:
+        data, ct = get_object(record["storage_path"])
+    except Exception as exc:
+        logger.exception("storage get failed: %s", exc)
+        raise HTTPException(status_code=502, detail="No se pudo recuperar el archivo")
+    return Response(
+        content=data,
+        media_type=record.get("content_type") or ct,
+        headers={"Content-Disposition": f'inline; filename="{record["original_filename"]}"'},
+    )
+
+
+@api.delete("/files/{file_id}")
+async def soft_delete_file(file_id: str, user: dict = Depends(require_role("admin", "manager"))):
+    r = await db.files.update_one({"id": file_id}, {"$set": {"is_deleted": True, "updated_at": now_iso()}})
+    if r.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Archivo no encontrado")
+    # detach from any service
+    await db.services.update_many({"photos": file_id}, {"$pull": {"photos": file_id}})
     return {"ok": True}
 
 
@@ -1144,6 +1364,8 @@ async def ensure_indexes():
     await db.services.create_index("status")
     await db.services.create_index("client_id")
     await db.quotes.create_index("status")
+    await db.user_sessions.create_index("session_token", unique=True)
+    await db.user_sessions.create_index("expires_at")
 
 
 async def seed_admin():
@@ -1169,6 +1391,11 @@ async def seed_admin():
 async def _startup():
     await ensure_indexes()
     await seed_admin()
+    try:
+        from storage import init_storage as _init
+        _init()
+    except Exception as exc:
+        logger.warning("Storage init failed (uploads will error until fixed): %s", exc)
 
 
 @app.on_event("shutdown")
