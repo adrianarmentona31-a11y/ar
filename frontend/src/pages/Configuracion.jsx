@@ -4,9 +4,12 @@ import { Save } from "lucide-react";
 import { api, formatApiError } from "../lib/api";
 import { useI18n } from "../context/I18nContext";
 import { PageHeader, Field, Input, Textarea } from "../components/ui-kit";
+import { TeamPanel } from "../components/TeamPanel";
+import { useAuth } from "../context/AuthContext";
 
 export default function Configuracion() {
   const { t } = useI18n();
+  const { user } = useAuth();
   const [f, setF] = useState(null);
   const [saving, setSaving] = useState(false);
 
@@ -63,6 +66,7 @@ export default function Configuracion() {
           <Save size={14} />{saving ? t.common.saving : t.configuracion.save}
         </button>
       </form>
+      {user?.role === "admin" && <TeamPanel />}
     </div>
   );
 }

@@ -97,6 +97,8 @@ async def get_current_user(
             user = await db.users.find_one({"id": payload["sub"]}, {"_id": 0})
             if not user:
                 raise HTTPException(status_code=401, detail="Usuario no encontrado")
+            if not user.get("active", True):
+                raise HTTPException(status_code=401, detail="Cuenta desactivada")
             user.pop("password_hash", None)
             return user
         except jwt.ExpiredSignatureError:
@@ -120,6 +122,8 @@ async def get_current_user(
         user = await db.users.find_one({"id": sess["user_id"]}, {"_id": 0})
         if not user:
             raise HTTPException(status_code=401, detail="Usuario no encontrado")
+        if not user.get("active", True):
+            raise HTTPException(status_code=401, detail="Cuenta desactivada")
         user.pop("password_hash", None)
         return user
 
@@ -132,6 +136,31 @@ def require_role(*roles: str):
             raise HTTPException(status_code=403, detail="Permisos insuficientes")
         return user
     return _dep
+
+
+STAFF_ROLES = ("admin", "manager", "technician", "assistant")
+require_staff = require_role(*STAFF_ROLES)
+require_finance = require_role("admin", "manager")
+
+# --- simple in-memory rate limiting (per process) ---
+import time as _time  # noqa: E402
+from collections import defaultdict, deque  # noqa: E402
+_RATE: dict = defaultdict(deque)
+
+
+def rate_limit(key: str, limit: int, window_s: int, record: bool = True):
+    now = _time.monotonic()
+    q = _RATE[key]
+    while q and now - q[0] > window_s:
+        q.popleft()
+    if len(q) >= limit:
+        raise HTTPException(status_code=429, detail="Demasiados intentos. Intenta más tarde.")
+    if record:
+        q.append(now)
+
+
+def rate_record(key: str):
+    _RATE[key].append(_time.monotonic())
 
 
 # ---------------------------------------------------------------------------
@@ -181,15 +210,21 @@ class LoginResponse(BaseModel):
 
 
 @api.post("/auth/login", response_model=LoginResponse)
-async def login(body: LoginBody):
+async def login(body: LoginBody, request: Request):
     identifier = body.identifier.strip().lower()
     if not identifier or not body.password:
         raise HTTPException(status_code=400, detail="Ingresa usuario y contraseña.")
+    client_ip = (request.headers.get("x-forwarded-for") or (request.client.host if request.client else "?")).split(",")[0].strip()
+    rate_limit(f"login:{client_ip}", 15, 300, record=False)
+    rate_limit(f"login:{identifier}", 10, 300, record=False)
     user_doc = await db.users.find_one(
         {"$or": [{"username": identifier}, {"email": identifier}]}
     )
     if not user_doc or not verify_password(body.password, user_doc.get("password_hash", "")):
+        rate_record(f"login:{client_ip}"); rate_record(f"login:{identifier}")
         raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos.")
+    if not user_doc.get("active", True):
+        raise HTTPException(status_code=403, detail="Cuenta desactivada.")
     token = create_access_token(user_doc["id"], user_doc["username"], user_doc["role"])
     started = now_dt()
     await db.users.update_one({"id": user_doc["id"]}, {"$set": {"last_login_at": started.isoformat()}})
@@ -249,14 +284,19 @@ async def google_session_exchange(request: Request):
     admin_email = os.environ.get("ADMIN_EMAIL", "").strip().lower()
     user_doc = await db.users.find_one({"email": email})
     if user_doc is None:
+        if email != admin_email:
+            logger.warning("Google sign-in denied for non-invited account: %s", email)
+            raise HTTPException(status_code=403, detail="Esta cuenta no está autorizada. Pide al administrador que te invite.")
         user_doc = {
             "id": str(uuid.uuid4()),
             "username": email, "email": email, "name": name,
-            "role": "admin" if email == admin_email else "viewer",
+            "role": "admin",
             "picture": picture, "google_linked": True,
             "created_at": now_iso(), "last_login_at": now_iso(),
         }
         await db.users.insert_one(user_doc)
+    if not user_doc.get("active", True):
+        raise HTTPException(status_code=403, detail="Cuenta desactivada.")
     else:
         await db.users.update_one(
             {"id": user_doc["id"]},
@@ -354,6 +394,15 @@ async def list_files(user: dict = Depends(get_current_user), service_id: Optiona
     return {"items": [FileOut(**_clean_doc(d)).model_dump() for d in docs]}
 
 
+@api.get("/files/{file_id}/view-token")
+async def file_view_token(file_id: str, user: dict = Depends(get_current_user)):
+    if not await db.files.find_one({"id": file_id, "is_deleted": False}, {"_id": 1}):
+        raise HTTPException(status_code=404, detail="Archivo no encontrado")
+    exp = now_dt() + timedelta(minutes=15)
+    tok = jwt.encode({"sub": user["id"], "type": "file", "file_id": file_id, "exp": exp}, get_jwt_secret(), algorithm=JWT_ALGORITHM)
+    return {"token": tok, "expires_at": exp.isoformat()}
+
+
 @api.get("/files/{file_id}/download")
 async def download_file(
     file_id: str,
@@ -369,7 +418,10 @@ async def download_file(
     if token:
         try:
             payload = jwt.decode(token, get_jwt_secret(), algorithms=[JWT_ALGORITHM])
-            if payload.get("type") != "access":
+            if auth and not (creds and creds.scheme.lower() == "bearer"):
+                if payload.get("type") != "file" or payload.get("file_id") != file_id:
+                    raise HTTPException(status_code=401, detail="Token de archivo inválido")
+            elif payload.get("type") != "access":
                 raise HTTPException(status_code=401, detail="Token inválido")
             if not await db.users.find_one({"id": payload["sub"]}, {"_id": 1}):
                 raise HTTPException(status_code=401, detail="Usuario no encontrado")
@@ -452,7 +504,7 @@ def _client_out(doc: dict) -> ClientOut:
 
 
 @api.post("/clients", response_model=ClientOut, status_code=201)
-async def create_client(body: ClientCreate, user: dict = Depends(get_current_user)):
+async def create_client(body: ClientCreate, user: dict = Depends(require_staff)):
     doc = {
         "id": str(uuid.uuid4()),
         "tipo": body.tipo,
@@ -497,7 +549,7 @@ async def get_client(cid: str, user: dict = Depends(get_current_user)):
 
 
 @api.patch("/clients/{cid}", response_model=ClientOut)
-async def update_client(cid: str, body: ClientUpdate, user: dict = Depends(get_current_user)):
+async def update_client(cid: str, body: ClientUpdate, user: dict = Depends(require_staff)):
     doc = await db.clients.find_one({"id": cid})
     if not doc: raise HTTPException(404, "Cliente no encontrado")
     patch = {k: (v.strip() if isinstance(v, str) else v) for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
@@ -558,7 +610,7 @@ class CompanyOut(BaseModel):
 
 
 @api.post("/companies", response_model=CompanyOut, status_code=201)
-async def create_company(body: CompanyCreate, user: dict = Depends(get_current_user)):
+async def create_company(body: CompanyCreate, user: dict = Depends(require_staff)):
     doc = body.model_dump()
     doc.update({
         "id": str(uuid.uuid4()),
@@ -583,7 +635,7 @@ async def list_companies(user: dict = Depends(get_current_user), q: Optional[str
 
 
 @api.patch("/companies/{cid}", response_model=CompanyOut)
-async def update_company(cid: str, body: CompanyUpdate, user: dict = Depends(get_current_user)):
+async def update_company(cid: str, body: CompanyUpdate, user: dict = Depends(require_staff)):
     doc = await db.companies.find_one({"id": cid})
     if not doc: raise HTTPException(404, "Empresa no encontrada")
     patch = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
@@ -655,7 +707,7 @@ class VehicleOut(BaseModel):
 
 
 @api.post("/vehicles", response_model=VehicleOut, status_code=201)
-async def create_vehicle(body: VehicleCreate, user: dict = Depends(get_current_user)):
+async def create_vehicle(body: VehicleCreate, user: dict = Depends(require_staff)):
     if body.client_id and not await db.clients.find_one({"id": body.client_id}):
         raise HTTPException(400, "Cliente no válido")
     doc = body.model_dump()
@@ -704,7 +756,7 @@ async def get_vehicle(vid: str, user: dict = Depends(get_current_user)):
 
 
 @api.patch("/vehicles/{vid}", response_model=VehicleOut)
-async def update_vehicle(vid: str, body: VehicleUpdate, user: dict = Depends(get_current_user)):
+async def update_vehicle(vid: str, body: VehicleUpdate, user: dict = Depends(require_staff)):
     doc = await db.vehicles.find_one({"id": vid})
     if not doc: raise HTTPException(404, "Vehículo no encontrado")
     patch = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
@@ -759,7 +811,7 @@ class TechnicianOut(BaseModel):
 
 
 @api.post("/technicians", response_model=TechnicianOut, status_code=201)
-async def create_tech(body: TechnicianCreate, user: dict = Depends(get_current_user)):
+async def create_tech(body: TechnicianCreate, user: dict = Depends(require_staff)):
     doc = body.model_dump()
     doc.update({"id": str(uuid.uuid4()), "created_at": now_iso(), "updated_at": now_iso()})
     await db.technicians.insert_one(doc)
@@ -773,7 +825,7 @@ async def list_techs(user: dict = Depends(get_current_user)):
 
 
 @api.patch("/technicians/{tid}", response_model=TechnicianOut)
-async def update_tech(tid: str, body: TechnicianUpdate, user: dict = Depends(get_current_user)):
+async def update_tech(tid: str, body: TechnicianUpdate, user: dict = Depends(require_staff)):
     doc = await db.technicians.find_one({"id": tid})
     if not doc: raise HTTPException(404, "Técnico no encontrado")
     patch = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
@@ -865,7 +917,7 @@ async def _next_folio(prefix: str, coll) -> str:
 
 
 @api.post("/quotes", response_model=QuoteOut, status_code=201)
-async def create_quote(body: QuoteCreate, user: dict = Depends(get_current_user)):
+async def create_quote(body: QuoteCreate, user: dict = Depends(require_staff)):
     if body.client_id and not await db.clients.find_one({"id": body.client_id}):
         raise HTTPException(400, "Cliente no válido")
     items = body.items or []
@@ -920,7 +972,7 @@ async def get_quote(qid: str, user: dict = Depends(get_current_user)):
 
 
 @api.patch("/quotes/{qid}", response_model=QuoteOut)
-async def update_quote(qid: str, body: QuoteUpdate, user: dict = Depends(get_current_user)):
+async def update_quote(qid: str, body: QuoteUpdate, user: dict = Depends(require_staff)):
     doc = await db.quotes.find_one({"id": qid})
     if not doc: raise HTTPException(404, "Cotización no encontrada")
     patch = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
@@ -1020,7 +1072,7 @@ class ServiceOut(BaseModel):
 
 
 @api.post("/services", response_model=ServiceOut, status_code=201)
-async def create_service(body: ServiceCreate, user: dict = Depends(get_current_user)):
+async def create_service(body: ServiceCreate, user: dict = Depends(require_staff)):
     if body.client_id and not await db.clients.find_one({"id": body.client_id}):
         raise HTTPException(400, "Cliente no válido")
     items = body.items or []
@@ -1096,7 +1148,7 @@ async def get_service(sid: str, user: dict = Depends(get_current_user)):
 
 
 @api.patch("/services/{sid}", response_model=ServiceOut)
-async def update_service(sid: str, body: ServiceUpdate, user: dict = Depends(get_current_user)):
+async def update_service(sid: str, body: ServiceUpdate, user: dict = Depends(require_staff)):
     doc = await db.services.find_one({"id": sid})
     if not doc: raise HTTPException(404, "Servicio no encontrado")
     patch = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
@@ -1152,7 +1204,7 @@ class PaymentOut(BaseModel):
 
 
 @api.post("/payments", response_model=PaymentOut, status_code=201)
-async def create_payment(body: PaymentCreate, user: dict = Depends(get_current_user)):
+async def create_payment(body: PaymentCreate, user: dict = Depends(require_staff)):
     folio = await _next_folio("PAG", db.payments)
     date = body.date or now_iso()
     doc = {
@@ -1236,7 +1288,11 @@ async def get_settings(user: dict = Depends(get_current_user)):
         doc = {**DEFAULT_SETTINGS, "_id": "singleton"}
         await db.settings.insert_one(doc)
     doc.pop("_id", None)
-    return {**DEFAULT_SETTINGS, **doc}
+    out = {**DEFAULT_SETTINGS, **doc}
+    if user.get("role") not in ("admin", "manager"):
+        for k in ("bank_card", "bank_clabe"):
+            out.pop(k, None)
+    return out
 
 
 @api.get("/qr")
@@ -1289,7 +1345,7 @@ async def dashboard_summary(user: dict = Depends(get_current_user)):
 
 
 @api.get("/finance/summary")
-async def finance_summary(user: dict = Depends(get_current_user)):
+async def finance_summary(user: dict = Depends(require_finance)):
     revenue = 0.0
     cost = 0.0
     profit = 0.0
@@ -1394,7 +1450,7 @@ class TuneupPresetItems(BaseModel):
 
 
 @api.post("/catalog/tuneups/preset-items")
-async def tuneup_preset_items(body: TuneupPresetItems, user: dict = Depends(get_current_user)):
+async def tuneup_preset_items(body: TuneupPresetItems, user: dict = Depends(require_staff)):
     """Return QuoteItem[] ready to be dropped into a Service or Quote form."""
     tier = next((t for t in TUNEUP_CATALOG["tiers"] if t["key"] == body.tier), None)
     if not tier:
@@ -1433,7 +1489,8 @@ class ImageGenRequest(BaseModel):
 
 
 @api.post("/ai/images/generate")
-async def ai_generate_image(body: ImageGenRequest, user: dict = Depends(get_current_user)):
+async def ai_generate_image(body: ImageGenRequest, user: dict = Depends(require_staff)):
+    rate_limit(f"ai:{user['id']}", 30, 24 * 3600)
     api_key = os.environ.get("EMERGENT_LLM_KEY", "").strip()
     if not api_key:
         raise HTTPException(status_code=500, detail="EMERGENT_LLM_KEY no configurado")
@@ -1557,7 +1614,7 @@ async def _payment_context(p: dict) -> dict:
 
 
 @api.post("/payments/{pid}/send-email")
-async def send_payment_email(pid: str, user: dict = Depends(get_current_user)):
+async def send_payment_email(pid: str, user: dict = Depends(require_staff)):
     from html import escape
     from email_service import send_email, EMAIL_FROM_NAME
     p = await db.payments.find_one({"id": pid})
@@ -1675,7 +1732,7 @@ def _note_fill(doc: dict):
 
 
 @api.post("/notes", response_model=NoteOut, status_code=201)
-async def create_note(body: NoteCreate, user: dict = Depends(get_current_user)):
+async def create_note(body: NoteCreate, user: dict = Depends(require_staff)):
     doc = body.model_dump()
     doc["items"] = [it.model_dump() for it in body.items]
     if body.client_id:
@@ -1709,7 +1766,7 @@ async def get_note(nid: str, user: dict = Depends(get_current_user)):
 
 
 @api.patch("/notes/{nid}", response_model=NoteOut)
-async def update_note(nid: str, body: NoteUpdate, user: dict = Depends(get_current_user)):
+async def update_note(nid: str, body: NoteUpdate, user: dict = Depends(require_staff)):
     doc = await db.notes.find_one({"id": nid})
     if not doc: raise HTTPException(404, "Nota no encontrada")
     upd = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
@@ -1729,7 +1786,7 @@ async def delete_note(nid: str, user: dict = Depends(require_role("admin", "mana
 
 
 @api.post("/notes/{nid}/send-email")
-async def send_note_email(nid: str, user: dict = Depends(get_current_user)):
+async def send_note_email(nid: str, user: dict = Depends(require_staff)):
     from html import escape
     from email_service import send_email, EMAIL_FROM_NAME
     doc = await db.notes.find_one({"id": nid})
@@ -1796,7 +1853,7 @@ async def _service_photos_payload(doc_id: str):
 
 
 @api.post("/services/{sid}/send-receipt-email")
-async def send_service_receipt_email(sid: str, user: dict = Depends(get_current_user)):
+async def send_service_receipt_email(sid: str, user: dict = Depends(require_staff)):
     from email_service import send_email, EMAIL_FROM_NAME
     doc = await db.services.find_one({"id": sid})
     if not doc:
@@ -1827,6 +1884,64 @@ async def send_service_receipt_email(sid: str, user: dict = Depends(get_current_
     )
     await db.services.update_one({"id": sid}, {"$set": {"receipt_emailed_at": now_iso(), "receipt_emailed_to": client_email}})
     return {"ok": True, "email_id": email_id, "to": client_email}
+
+
+# ---------------------------------------------------------------------------
+# EQUIPO (usuarios autorizados) — solo admin
+# ---------------------------------------------------------------------------
+class TeamInvite(BaseModel):
+    email: EmailStr
+    name: Optional[str] = ""
+    role: Role = "technician"
+
+
+class TeamUpdate(BaseModel):
+    role: Optional[Role] = None
+    active: Optional[bool] = None
+    name: Optional[str] = None
+
+
+def _team_out(u: dict) -> dict:
+    return {"id": u["id"], "email": u.get("email", ""), "name": u.get("name") or u.get("username", ""), "role": u.get("role", "viewer"),
+            "active": u.get("active", True), "google_linked": bool(u.get("google_linked")), "last_login_at": u.get("last_login_at"), "created_at": u.get("created_at")}
+
+
+@api.get("/team")
+async def list_team(user: dict = Depends(require_role("admin"))):
+    docs = await db.users.find({}, {"_id": 0, "password_hash": 0}).sort("created_at", 1).to_list(200)
+    return {"items": [_team_out(u) for u in docs]}
+
+
+@api.post("/team", status_code=201)
+async def invite_team(body: TeamInvite, user: dict = Depends(require_role("admin"))):
+    email = body.email.strip().lower()
+    if await db.users.find_one({"email": email}):
+        raise HTTPException(409, "Ese correo ya está registrado")
+    doc = {"id": str(uuid.uuid4()), "username": email, "email": email, "name": (body.name or "").strip() or email,
+           "role": body.role, "active": True, "google_linked": False, "invited_by": user["id"], "created_at": now_iso()}
+    await db.users.insert_one(doc)
+    return _team_out(doc)
+
+
+@api.patch("/team/{uid}")
+async def update_team(uid: str, body: TeamUpdate, user: dict = Depends(require_role("admin"))):
+    target = await db.users.find_one({"id": uid})
+    if not target: raise HTTPException(404, "Usuario no encontrado")
+    upd = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
+    if uid == user["id"] and (upd.get("role") not in (None, "admin") or upd.get("active") is False):
+        raise HTTPException(400, "No puedes quitarte tu propio acceso de administrador")
+    await db.users.update_one({"id": uid}, {"$set": upd})
+    target.update(upd)
+    return _team_out(target)
+
+
+@api.delete("/team/{uid}")
+async def delete_team(uid: str, user: dict = Depends(require_role("admin"))):
+    if uid == user["id"]: raise HTTPException(400, "No puedes eliminarte a ti mismo")
+    r = await db.users.delete_one({"id": uid})
+    if r.deleted_count == 0: raise HTTPException(404, "Usuario no encontrado")
+    await db.user_sessions.delete_many({"user_id": uid})
+    return {"ok": True}
 
 
 # ---------------------------------------------------------------------------
@@ -1886,7 +2001,7 @@ app.include_router(api)
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origins=os.environ.get("CORS_ORIGINS", "*").split(","),
+    allow_origins=[o.strip() for o in os.environ.get("CORS_ORIGINS", "").split(",") if o.strip()],
     allow_methods=["*"],
     allow_headers=["*"],
 )

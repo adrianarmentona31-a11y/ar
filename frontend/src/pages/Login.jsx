@@ -67,7 +67,6 @@ export default function Login() {
         <div className="w-full max-w-md">
           <div className="flex flex-col items-center mb-8">
             <ArmentaWordmark width={380} className="mb-1 -mt-4" />
-            <div className="brand-ribbon" data-testid="login-ribbon">Servicio a domicilio</div>
             <p className="text-xs text-zinc-500 mt-3 font-mono-tactical tracking-[0.28em] uppercase">
               {t.brand.tagline}
             </p>

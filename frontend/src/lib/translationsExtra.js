@@ -160,6 +160,12 @@ export const extraTranslations = {
       survey_url: "Liga encuesta de satisfacción (Google Forms)",
       save: "Guardar cambios",
     },
+    equipo: {
+      title: "Equipo y accesos", subtitle: "Solo las cuentas invitadas pueden entrar con Google.",
+      role: "Rol", invite: "Invitar", invited: "Invitación creada. Ya puede entrar con Google.", removed: "Acceso eliminado.",
+      you: "tú", pending_login: "Sin ingresar", active: "Activo", inactive: "Inactivo",
+      roles: { admin: "Administrador", manager: "Gerente", technician: "Técnico", assistant: "Asistente", viewer: "Solo lectura" },
+    },
     transferencia: {
       title: "Datos de transferencia", kicker: "Información para", title_big: "Transferencia",
       thanks: "Gracias por tu confianza", holder: "Titular de la cuenta", bank: "Banco",
@@ -341,6 +347,12 @@ export const extraTranslations = {
       currency: "Currency", footer_note: "Receipt footer note",
       survey_url: "Satisfaction survey link (Google Forms)",
       save: "Save changes",
+    },
+    equipo: {
+      title: "Team & access", subtitle: "Only invited accounts can sign in with Google.",
+      role: "Role", invite: "Invite", invited: "Invitation created. They can now sign in with Google.", removed: "Access removed.",
+      you: "you", pending_login: "Never signed in", active: "Active", inactive: "Inactive",
+      roles: { admin: "Administrator", manager: "Manager", technician: "Technician", assistant: "Assistant", viewer: "Read only" },
     },
     transferencia: {
       title: "Bank transfer details", kicker: "Information for", title_big: "Transfer",

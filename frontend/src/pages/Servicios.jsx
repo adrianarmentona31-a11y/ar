@@ -7,6 +7,7 @@ import { useI18n } from "../context/I18nContext";
 import { fmtDate, fmtMoney } from "../lib/format";
 import { Modal, Field, Input, Textarea, Select, PageHeader, StatusBadge } from "../components/ui-kit";
 import { whatsappSurveyUrl } from "../lib/surveyLink";
+import { SecureImg } from "../components/SecureImg";
 
 function EmailReceiptButton({ service }) {
   const { t } = useI18n();
@@ -110,9 +111,6 @@ function ServicePhotos({ serviceId }) {
     catch (e) { toast.error(formatApiError(e)); }
   };
 
-  const token = (() => { try { return JSON.parse(localStorage.getItem("armenta_os_session_v1") || "{}").token || ""; } catch { return ""; } })();
-  const src = (id) => `${process.env.REACT_APP_BACKEND_URL}/api/files/${id}/download${token ? `?auth=${encodeURIComponent(token)}` : ""}`;
-
   return (
     <div className="pt-2 border-t border-[#1a1a1a]">
       <div className="flex items-center justify-between mb-3">
@@ -153,7 +151,7 @@ function ServicePhotos({ serviceId }) {
           {items.map((f) => (
             <div key={f.id} className="relative group aspect-square rounded-lg overflow-hidden border border-[#262626] bg-[#0d0d0d]">
               {f.content_type?.startsWith("image/") ? (
-                <img src={src(f.id)} alt={f.original_filename} className="w-full h-full object-cover" />
+                <SecureImg fileId={f.id} alt={f.original_filename} className="w-full h-full object-cover" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-xs text-zinc-500 p-2 text-center">{f.original_filename}</div>
               )}
