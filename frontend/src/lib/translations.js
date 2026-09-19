@@ -5,7 +5,7 @@ export const translations = {
   es: {
     brand: {
       company: "ARMENTA'S MOTORS",
-      product: "ARMENTA OS",
+      product: "Armenta's Motors Company",
       tagline: "Sistema Operativo de Servicios Automotrices",
     },
     login: {
@@ -133,7 +133,7 @@ export const translations = {
   en: {
     brand: {
       company: "ARMENTA'S MOTORS",
-      product: "ARMENTA OS",
+      product: "Armenta's Motors Company",
       tagline: "Automotive Service Operating System",
     },
     login: {

@@ -32,8 +32,8 @@ export function Header() {
         <div className="flex items-center gap-3">
           <BrandMark size={40} />
           <div className="flex flex-col leading-tight">
-            <span className="font-display uppercase text-[15px] tracking-wider text-white">
-              ARMENTA <span className="text-[#dc2626]">OS</span>
+            <span className="font-display uppercase text-[13px] sm:text-[14px] tracking-wider text-white leading-tight">
+              Armenta's Motors <span className="text-[#dc2626]">Company</span>
             </span>
             <span className="hidden sm:inline text-[10px] font-mono-tactical uppercase tracking-widest text-zinc-500">
               {t.brand.company}

@@ -51,7 +51,7 @@ mongo_url = os.environ["MONGO_URL"]
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ["DB_NAME"]]
 
-app = FastAPI(title="ARMENTA OS API", version="0.2.0")
+app = FastAPI(title="Armenta's Motors Company API", version="0.3.0")
 api = APIRouter(prefix="/api")
 security = HTTPBearer(auto_error=False)
 
@@ -1203,14 +1203,14 @@ class SettingsUpdate(BaseModel):
 
 
 DEFAULT_SETTINGS = {
-    "company_name": "ARMENTA'S MOTORS",
+    "company_name": "Armenta's Motors Company",
     "company_rfc": "",
     "company_phone": "",
     "company_email": "adrianarmentona31@gmail.com",
     "company_address": "Ciudad Juárez, Chihuahua",
     "tax_rate": 0.16,
     "currency": "MXN",
-    "footer_note": "Gracias por confiar en ARMENTA'S MOTORS. Servicio automotriz móvil profesional.",
+    "footer_note": "Gracias por confiar en Armenta's Motors Company. Servicio automotriz móvil profesional.",
 }
 
 
@@ -1297,7 +1297,7 @@ async def finance_summary(user: dict = Depends(get_current_user)):
 
 @api.get("/health")
 async def health():
-    return {"status": "ok", "service": "armenta-os", "phase": "2+"}
+    return {"status": "ok", "service": "armentas-motors-company", "phase": "2+"}
 
 
 # ---------------------------------------------------------------------------
