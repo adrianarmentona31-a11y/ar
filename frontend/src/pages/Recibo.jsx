@@ -5,6 +5,8 @@ import { toast } from "sonner";
 import { api, formatApiError } from "../lib/api";
 import { useI18n } from "../context/I18nContext";
 import { fmtMoney, fmtDate } from "../lib/format";
+import { ShareReceipt } from "../components/ShareReceipt";
+import { BrandMark } from "../components/BrandMark";
 
 /**
  * Receipt / sales preview. Works for both quotes and services.
@@ -97,6 +99,7 @@ export default function Recibo() {
       <div className="flex items-center justify-between print-hidden gap-2 flex-wrap">
         <button onClick={() => navigate(-1)} className="armenta-btn-ghost !h-11 !px-4 flex items-center gap-2" data-testid="recibo-back"><ArrowLeft size={14} />{t.recibo.back}</button>
         <div className="flex items-center gap-2">
+          <ShareReceipt kind={kind} id={id} folio={doc.folio} clientName={client.nombre} clientPhone={client.telefono} />
           <button onClick={() => window.print()} className="armenta-btn-ghost !h-11 !px-4 flex items-center gap-2" data-testid="recibo-print"><Printer size={14} />{t.recibo.print}</button>
           <button onClick={downloadPdf} disabled={downloading} className="armenta-btn-primary !w-auto !h-11 !px-5 flex items-center gap-2" data-testid="recibo-download-pdf">
             {downloading ? <span className="spinner" /> : <Download size={14} />}
@@ -108,22 +111,24 @@ export default function Recibo() {
       {/* Paper */}
       <div id="receipt-paper" className="receipt-paper" data-testid="recibo-paper">
         {/* Header */}
-        <div className="receipt-header receipt-header-simple">
-          <div className="receipt-logo-box"><img src="/armenta_wordmark.png" alt="ARMENTA'S MOTORS" /></div>
-          <div className="receipt-company">{settings?.company_name?.toUpperCase() || "ARMENTA'S MOTORS"}</div>
-          <div className="receipt-meta">
-            <div>Servicio Automotriz Profesional a Domicilio</div>
-            {settings?.company_address && <div>{settings.company_address}</div>}
-            {settings?.company_phone && <div>Tel. {settings.company_phone}</div>}
-            {settings?.company_email && <div>{settings.company_email}</div>}
-            {settings?.company_rfc && <div>RFC: {settings.company_rfc}</div>}
-          </div>
-          <div className="receipt-title-row">
-            <h1 className="receipt-doc-title">{docTitle}</h1>
-            <div className="receipt-folio">
-              <div className="receipt-folio-value">{doc.folio}</div>
-              <div className="receipt-status">{statusLabel}</div>
+        <div className="receipt-header">
+          <div className="flex items-center gap-5">
+            <BrandMark size={72} />
+            <div>
+              <img src="/armenta_wordmark.png" alt="ARMENTA'S MOTORS" style={{ width: 170 }} draggable={false} />
+              <div className="receipt-meta">
+                <div>{settings?.company_name || "Armenta's Motors Company"}</div>
+                {settings?.company_address && <div>{settings.company_address}</div>}
+                {settings?.company_phone && <div>Tel. {settings.company_phone}</div>}
+                {settings?.company_email && <div>{settings.company_email}</div>}
+                {settings?.company_rfc && <div>RFC: {settings.company_rfc}</div>}
+              </div>
             </div>
+          </div>
+          <div className="receipt-folio">
+            <div className="receipt-folio-label">{docTitle}</div>
+            <div className="receipt-folio-value">{doc.folio}</div>
+            <div className="receipt-status">{statusLabel}</div>
           </div>
         </div>
 

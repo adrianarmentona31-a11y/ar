@@ -8,6 +8,7 @@ import { fmtDate, fmtMoney } from "../lib/format";
 import { Modal, Field, Input, Textarea, Select, PageHeader, StatusBadge } from "../components/ui-kit";
 import { whatsappSurveyUrl } from "../lib/surveyLink";
 import { SecureImg } from "../components/SecureImg";
+import { ShareReceipt } from "../components/ShareReceipt";
 
 function EmailReceiptButton({ service }) {
   const { t } = useI18n();
@@ -386,6 +387,7 @@ function ServiceForm({ initial, clients, vehicles, technicians, onClose, onSaved
           <button type="submit" className="armenta-btn-primary flex-1 !h-12" disabled={saving} data-testid="service-submit">{saving ? t.common.saving : t.common.save}</button>
           {editing && <Link to={`/recibo/servicio/${initial.id}`} className="h-12 px-4 rounded-lg border border-[#dc262666] bg-[#dc262614] text-[#dc2626] hover:bg-[#dc262622] flex items-center justify-center gap-2 text-sm font-semibold" data-testid="service-view-receipt"><ReceiptIcon size={14} />{t.servicios.view_receipt}</Link>}
           {editing && <SurveyButton service={initial} />}
+          {editing && <ShareReceipt kind="servicio" id={initial.id} folio={initial.folio} clientName={initial.client?.nombre || f.client_name} clientPhone={initial.client?.telefono || f.client_phone} />}
           {editing && <EmailReceiptButton service={initial} />}
           {editing && <button type="button" onClick={doDelete} className="h-12 px-4 rounded-lg border border-red-900/60 bg-red-950/30 text-red-300 flex items-center gap-2 text-sm"><Trash2 size={14} />{t.common.delete}</button>}
           <button type="button" onClick={onClose} className="armenta-btn-ghost !h-12 !px-4">{t.common.cancel}</button>

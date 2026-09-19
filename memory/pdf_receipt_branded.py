@@ -1,4 +1,9 @@
-"""ARMENTA OS — Simple, clean PDF documents (cotización / orden / nota / recibo de pago)."""
+"""ARMENTA OS — Server-side PDF receipt renderer.
+
+Uses the official ARMENTA'S MOTORS brand assets (hex-A brand mark + primary
+wordmark) rendered as embedded raster images, plus a red folio pill,
+itemized table, totals block, signature lines and footer.
+"""
 from datetime import datetime
 from io import BytesIO
 from pathlib import Path
@@ -14,250 +19,63 @@ ASSETS_DIR = Path(__file__).parent / "assets"
 WORDMARK_PATH = ASSETS_DIR / "armenta_wordmark.png"
 HEX_PATH = ASSETS_DIR / "armenta_hex.png"
 
-INK = colors.HexColor("#111111")
-BLACK = colors.HexColor("#1a1a1a")
-MUTED = colors.HexColor("#555555")
-GRID = colors.HexColor("#8a8a8a")
-CELL = colors.HexColor("#d9d9d9")
-WHITE = colors.white
-RED = colors.HexColor("#dc2626")
-
-MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
-METHODS = {"cash": "Efectivo", "transfer": "Transferencia", "card": "Tarjeta", "other": "Otro"}
-
-TITLES = {"cotizacion": "COTIZACIÓN DE SERVICIO", "servicio": "ORDEN DE SERVICIO", "nota": "NOTA DE REMISIÓN", "pago": "RECIBO DE PAGO"}
-
-
-def _money(v, cur="MXN"):
-    try:
-        return f"${float(v or 0):,.2f} {cur}"
-    except Exception:
-        return f"$0.00 {cur}"
-
-
-def _date(iso) -> str:
-    if not iso:
-        return ""
-    try:
-        d = datetime.fromisoformat(iso.replace("Z", "+00:00")) if isinstance(iso, str) else iso
-        return f"{d.day} de {MESES[d.month - 1]} de {d.year}"
-    except Exception:
-        return str(iso)[:10]
-
-
-
+# Palette (aligned with UI)
+BG_WHITE = colors.HexColor("#ffffff")
+INK = colors.HexColor("#0a0a0a")
 INK_SOFT = colors.HexColor("#27272a")
+MUTED = colors.HexColor("#71717a")
 LIGHT = colors.HexColor("#a1a1aa")
 RULE = colors.HexColor("#e4e4e7")
+RED = colors.HexColor("#dc2626")
 RED_DARK = colors.HexColor("#991b1b")
 RED_TINT = colors.HexColor("#fef2f2")
 GREEN_TINT = colors.HexColor("#f0fdf4")
 GREEN_TEXT = colors.HexColor("#166534")
-BG_WHITE = colors.white
-_fmt_money = _money
-_fmt_date = _date
 
 
-def _draw_hex_mark(c, cx, cy, r):
+def _fmt_money(amount: float, currency: str = "MXN") -> str:
+    try:
+        val = float(amount or 0)
+    except Exception:
+        val = 0.0
+    return f"${val:,.2f} {currency}"
+
+
+def _fmt_date(iso: Optional[str]) -> str:
+    if not iso:
+        return ""
+    try:
+        s = iso.replace("Z", "+00:00") if isinstance(iso, str) else iso
+        d = datetime.fromisoformat(s) if isinstance(s, str) else s
+        return d.strftime("%d %b %Y")
+    except Exception:
+        return str(iso)[:10]
+
+
+def _draw_hex_mark(c: canvas.Canvas, cx: float, cy: float, r: float):
+    """Draw the official hex-A brand mark image centered at (cx, cy)."""
     try:
         img = ImageReader(str(HEX_PATH))
-        c.drawImage(img, cx - r, cy - r, width=r * 2, height=r * 2, mask="auto")
+        size = r * 2
+        c.drawImage(img, cx - r, cy - r, width=size, height=size, mask="auto")
     except Exception:
-        c.setFillColor(RED); c.circle(cx, cy, r, stroke=0, fill=1)
+        # Fallback: solid red hex if asset is missing
+        c.setFillColor(RED)
+        c.circle(cx, cy, r, stroke=0, fill=1)
 
 
-def _draw_wordmark(c, x, y, width=62 * mm):
+def _draw_wordmark(c: canvas.Canvas, x: float, y: float, width: float = 62 * mm):
+    """Draw the official ARMENTA'S / MOTORS primary logo at (x, y) top-left anchor."""
     try:
         img = ImageReader(str(WORDMARK_PATH))
         iw, ih = img.getSize()
-        h = width * ih / iw
-        c.drawImage(img, x, y - h, width=width, height=h, mask="auto")
+        aspect = ih / iw
+        height = width * aspect
+        c.drawImage(img, x, y - height, width=width, height=height, mask="auto")
     except Exception:
-        c.setFillColor(INK); c.setFont("Helvetica-Bold", 14); c.drawString(x, y - 8 * mm, "ARMENTA'S MOTORS")
-
-
-def _wrap(c, text, font, size, max_w):
-    words = str(text or "").split()
-    lines, cur = [], ""
-    for w in words:
-        cand = w if not cur else f"{cur} {w}"
-        if c.stringWidth(cand, font, size) <= max_w:
-            cur = cand
-        else:
-            if cur:
-                lines.append(cur)
-            cur = w
-    if cur:
-        lines.append(cur)
-    return lines or [""]
-
-
-def _header(c, settings, title, page_w, x, y):
-    """Black logo box + company name + tagline + document title. Returns new y."""
-    box_w, box_h = 76 * mm, 40 * mm
-    bx = (page_w - box_w) / 2
-    c.setFillColor(BLACK)
-    c.rect(bx, y - box_h, box_w, box_h, stroke=0, fill=1)
-    try:
-        img = ImageReader(str(WORDMARK_PATH))
-        iw, ih = img.getSize()
-        lw = box_w - 12 * mm
-        lh = lw * ih / iw
-        if lh > box_h - 6 * mm:
-            lh = box_h - 6 * mm
-            lw = lh * iw / ih
-        c.drawImage(img, bx + (box_w - lw) / 2, y - box_h + (box_h - lh) / 2, width=lw, height=lh, mask="auto")
-    except Exception:
-        c.setFillColor(WHITE)
-        c.setFont("Helvetica-Bold", 16)
-        c.drawCentredString(page_w / 2, y - box_h / 2, "ARMENTA'S MOTORS")
-    y -= box_h + 8 * mm
-    c.setFillColor(INK)
-    c.setFont("Helvetica-Bold", 18)
-    c.drawCentredString(page_w / 2, y, (settings.get("company_name") or "ARMENTA'S MOTORS").upper())
-    y -= 8 * mm
-    c.setFont("Helvetica", 10)
-    c.drawString(x, y, "Servicio Automotriz Profesional a Domicilio")
-    y -= 5 * mm
-    meta = " · ".join(v for v in [settings.get("company_address"), f"Tel. {settings['company_phone']}" if settings.get("company_phone") else None, settings.get("company_email")] if v)
-    if meta:
-        c.drawString(x, y, meta)
-        y -= 5 * mm
-    if settings.get("company_rfc"):
-        c.drawString(x, y, f"RFC: {settings['company_rfc']}")
-        y -= 5 * mm
-    y -= 6 * mm
-    c.setFont("Helvetica-Bold", 16)
-    c.drawString(x, y, title)
-    return y - 8 * mm
-
-
-def _kv_table(c, rows, x, y, w, label_w=58 * mm, row_h=7 * mm):
-    c.setLineWidth(0.6)
-    for k, v in rows:
-        c.setStrokeColor(GRID)
-        c.setFillColor(CELL)
-        c.rect(x, y - row_h, w, row_h, stroke=1, fill=1)
-        c.line(x + label_w, y, x + label_w, y - row_h)
         c.setFillColor(INK)
-        c.setFont("Helvetica", 9.5)
-        c.drawString(x + 3 * mm, y - row_h + 3 * mm, f"{k}:")
-        c.drawString(x + label_w + 3 * mm, y - row_h + 3 * mm, str(v or "—"))
-        y -= row_h
-    return y
-
-
-def _items_table(c, items, cur, x, y, w):
-    cols = [("SERVICIO", 0.30, "left"), ("DESCRIPCIÓN", 0.44, "left"), ("CANT.", 0.08, "center"), ("PRECIO", 0.18, "right")]
-    head_h = 9 * mm
-    c.setFillColor(BLACK)
-    c.rect(x, y - head_h, w, head_h, stroke=0, fill=1)
-    c.setFillColor(WHITE)
-    c.setFont("Helvetica", 9)
-    cx = x
-    for name, frac, align in cols:
-        cw = w * frac
-        if align == "right":
-            c.drawRightString(cx + cw - 3 * mm, y - head_h + 3.2 * mm, name)
-        elif align == "center":
-            c.drawCentredString(cx + cw / 2, y - head_h + 3.2 * mm, name)
-        else:
-            c.drawString(cx + 3 * mm, y - head_h + 3.2 * mm, name)
-        cx += cw
-    y -= head_h
-    if not items:
-        items = [{"description": "Sin conceptos registrados", "quantity": 0, "unit_price": 0}]
-    for it in items:
-        name = str(it.get("description", ""))
-        detail = "Mano de obra" if it.get("is_labor") else "Refacciones / materiales"
-        if it.get("detail"):
-            detail = str(it["detail"])
-        l1 = _wrap(c, name, "Helvetica", 9.5, w * 0.30 - 6 * mm)[:3]
-        l2 = _wrap(c, detail, "Helvetica", 9.5, w * 0.44 - 6 * mm)[:3]
-        n = max(len(l1), len(l2))
-        row_h = 4.5 * mm * n + 4.5 * mm
-        c.setStrokeColor(GRID)
-        c.setFillColor(CELL)
-        c.rect(x, y - row_h, w, row_h, stroke=1, fill=1)
-        cx = x
-        for _, frac, _ in cols[:-1]:
-            cx += w * frac
-            c.line(cx, y, cx, y - row_h)
-        c.setFillColor(INK)
-        c.setFont("Helvetica", 9.5)
-        ty = y - 6.5 * mm
-        for i in range(n):
-            if i < len(l1):
-                c.drawString(x + 3 * mm, ty - i * 4.5 * mm, l1[i])
-            if i < len(l2):
-                c.drawString(x + w * 0.30 + 3 * mm, ty - i * 4.5 * mm, l2[i])
-        qty = it.get("quantity", 0) or 0
-        c.drawCentredString(x + w * 0.74 + w * 0.08 / 2, ty, f"{qty:g}")
-        c.drawRightString(x + w - 3 * mm, ty, _money((qty or 0) * (it.get("unit_price", 0) or 0), cur))
-        y -= row_h
-    return y
-
-
-def _totals_table(c, rows, x, y, w, value_w=42 * mm, row_h=8 * mm):
-    for label, value, dark in rows:
-        c.setStrokeColor(GRID)
-        c.setLineWidth(0.6)
-        c.setFillColor(BLACK if dark else CELL)
-        c.rect(x, y - row_h, w, row_h, stroke=1, fill=1)
-        c.setFillColor(WHITE if dark else INK)
-        c.setFont("Helvetica-Bold", 10)
-        c.drawString(x + 3 * mm, y - row_h + 3.2 * mm, label)
-        c.drawRightString(x + w - 3 * mm, y - row_h + 3.2 * mm, value)
-        y -= row_h
-    return y
-
-
-def _bullets(c, title, lines, x, y, w):
-    c.setFillColor(INK)
-    c.setFont("Helvetica-Bold", 10)
-    c.drawString(x, y, title)
-    y -= 7 * mm
-    c.setFont("Helvetica", 9.5)
-    for line in lines:
-        for i, sub in enumerate(_wrap(c, line, "Helvetica", 9.5, w - 6 * mm)[:3]):
-            c.drawString(x, y, ("• " if i == 0 else "   ") + sub)
-            y -= 4.8 * mm
-    return y
-
-
-def _ensure(c, settings, y, needed, page_w, page_h, margin_x):
-    """Start a new page (with footer on the current one) if `needed` mm won't fit."""
-    if y - needed < 30 * mm:
-        _footer(c, settings, page_w, margin_x)
-        c.showPage()
-        return page_h - 22 * mm
-    return y
-
-
-def _footer(c, settings, page_w, margin_x):
-    survey_url = (settings.get("survey_url") or "").strip()
-    if survey_url:
-        from reportlab.graphics.barcode import qr as _qr
-        from reportlab.graphics.shapes import Drawing
-        from reportlab.graphics import renderPDF
-        qsize = 18 * mm
-        widget = _qr.QrCodeWidget(survey_url)
-        bx, by, bw, bh = widget.getBounds()
-        d = Drawing(qsize, qsize, transform=[qsize / (bw - bx), 0, 0, qsize / (bh - by), 0, 0])
-        d.add(widget)
-        qx = page_w - margin_x - qsize
-        renderPDF.draw(d, c, qx, 14 * mm)
-        c.setFillColor(INK)
-        c.setFont("Helvetica-Bold", 8)
-        c.drawRightString(qx - 3 * mm, 26 * mm, "¿Cómo fue tu servicio?")
-        c.setFillColor(MUTED)
-        c.setFont("Helvetica", 7.5)
-        c.drawRightString(qx - 3 * mm, 22 * mm, "Escanea el código y califícanos en 1 minuto.")
-    c.setFillColor(MUTED)
-    c.setFont("Helvetica", 7.5)
-    note = settings.get("footer_note") or "Gracias por confiar en ARMENTA'S MOTORS."
-    for i, line in enumerate(_wrap(c, note, "Helvetica", 7.5, page_w * 0.55)[:2]):
-        c.drawString(margin_x, 18 * mm - i * 3.5 * mm, line)
+        c.setFont("Helvetica-Bold", 14)
+        c.drawString(x, y - 8 * mm, "ARMENTA'S MOTORS")
 
 
 def build_receipt_pdf(doc: dict, settings: dict, kind: str = "servicio", photos: Optional[list] = None) -> bytes:
@@ -273,18 +91,16 @@ def build_receipt_pdf(doc: dict, settings: dict, kind: str = "servicio", photos:
     y = page_h - 22 * mm
 
     is_quote = kind == "cotizacion"
-    is_note = kind == "nota"
-    doc_label = {"cotizacion": "COTIZACIÓN", "servicio": "ORDEN DE SERVICIO", "nota": "NOTA DE REMISIÓN", "pago": "RECIBO DE PAGO"}.get(kind, "DOCUMENTO")
     currency = (settings or {}).get("currency") or "MXN"
 
     # ------------------- Header -------------------
     _draw_hex_mark(c, x + 10 * mm, y - 10 * mm, 10 * mm)
-    _draw_wordmark(c, x + 23 * mm, y + 1 * mm, width=38 * mm)
+    _draw_wordmark(c, x + 24 * mm, y - 2 * mm, width=58 * mm)
 
     # Company meta
     c.setFillColor(MUTED)
     c.setFont("Helvetica", 7.5)
-    meta_y = y - 27 * mm
+    meta_y = y - 26 * mm
     for line in [
         settings.get("company_address"),
         f"Tel. {settings.get('company_phone')}" if settings.get("company_phone") else None,
@@ -292,7 +108,7 @@ def build_receipt_pdf(doc: dict, settings: dict, kind: str = "servicio", photos:
         f"RFC: {settings.get('company_rfc')}" if settings.get("company_rfc") else None,
     ]:
         if line:
-            c.drawString(x, meta_y, line.upper())
+            c.drawString(x + 24 * mm, meta_y, line.upper())
             meta_y -= 3.4 * mm
 
     # Folio pill (top right)
@@ -307,7 +123,7 @@ def build_receipt_pdf(doc: dict, settings: dict, kind: str = "servicio", photos:
     c.setFillColor(RED)
     c.setFont("Helvetica-Bold", 7)
     c.drawRightString(pill_x + pill_w - 4 * mm, pill_y + pill_h - 6 * mm,
-                       doc_label)
+                       "COTIZACIÓN" if is_quote else "ORDEN DE SERVICIO")
     c.setFillColor(INK)
     c.setFont("Helvetica-Bold", 17)
     c.drawRightString(pill_x + pill_w - 4 * mm, pill_y + pill_h - 14 * mm, doc.get("folio", "—"))
@@ -373,8 +189,8 @@ def build_receipt_pdf(doc: dict, settings: dict, kind: str = "servicio", photos:
     c.setFillColor(BG_WHITE)
     c.setFont("Helvetica-Bold", 8)
     c.drawString(x + 3 * mm, tbl_top - 5.5 * mm, "CONCEPTO")
-    c.drawRightString(x + col_w * 3 - 66 * mm, tbl_top - 5.5 * mm, "CANT.")
-    c.drawRightString(x + col_w * 3 - 34 * mm, tbl_top - 5.5 * mm, "PRECIO UNIT.")
+    c.drawRightString(x + col_w * 3 - 46 * mm, tbl_top - 5.5 * mm, "CANT.")
+    c.drawRightString(x + col_w * 3 - 22 * mm, tbl_top - 5.5 * mm, "PRECIO UNIT.")
     c.drawRightString(page_w - margin_x - 3 * mm, tbl_top - 5.5 * mm, "IMPORTE")
 
     # rows
@@ -396,7 +212,7 @@ def build_receipt_pdf(doc: dict, settings: dict, kind: str = "servicio", photos:
             c.setFillColor(INK)
             c.setFont("Helvetica-Bold", 9.5)
             # wrap description
-            max_desc_w = col_w * 3 - 84 * mm
+            max_desc_w = col_w * 3 - 70 * mm
             desc_lines = _wrap(c, desc, "Helvetica-Bold", 9.5, max_desc_w)
             for i, line in enumerate(desc_lines[:2]):
                 c.drawString(x + 3 * mm, row_y - i * 4 * mm, line)
@@ -406,8 +222,8 @@ def build_receipt_pdf(doc: dict, settings: dict, kind: str = "servicio", photos:
                 c.drawString(x + 3 * mm, row_y - (len(desc_lines[:2])) * 4 * mm - 2 * mm, "MANO DE OBRA")
                 c.setFillColor(INK)
             c.setFont("Helvetica", 9.5)
-            c.drawRightString(x + col_w * 3 - 66 * mm, row_y, f"{qty:g}")
-            c.drawRightString(x + col_w * 3 - 34 * mm, row_y, _fmt_money(unit, currency))
+            c.drawRightString(x + col_w * 3 - 46 * mm, row_y, f"{qty:g}")
+            c.drawRightString(x + col_w * 3 - 22 * mm, row_y, _fmt_money(unit, currency))
             c.setFont("Helvetica-Bold", 9.5)
             c.drawRightString(page_w - margin_x - 3 * mm, row_y, _fmt_money(amount, currency))
             row_height = 7 * mm + (len(desc_lines[:2]) - 1) * 4 * mm + (3 * mm if it.get("is_labor") else 0)
@@ -433,7 +249,7 @@ def build_receipt_pdf(doc: dict, settings: dict, kind: str = "servicio", photos:
             c.drawString(totals_x + 6 * mm, ty - 5.8 * mm, label)
             c.setFont("Helvetica-Bold", 11)
             c.drawRightString(totals_x + totals_w - 3 * mm, ty - 5.8 * mm, value)
-            ty -= 14 * mm
+            ty -= 11 * mm
         elif tone in ("outstanding", "settled"):
             bg = RED_TINT if tone == "outstanding" else GREEN_TINT
             fg = RED_DARK if tone == "outstanding" else GREEN_TEXT
@@ -457,23 +273,12 @@ def build_receipt_pdf(doc: dict, settings: dict, kind: str = "servicio", photos:
     tax_rate = doc.get("tax_rate", 0) or 0
     _totals_row("Subtotal", _fmt_money(doc.get("subtotal", 0), currency))
     _totals_row(f"IVA ({round(tax_rate * 100)}%)", _fmt_money(doc.get("tax", 0), currency))
-    _totals_row("Monto recibido" if kind == "pago" else "Total a pagar", _fmt_money(doc.get("total", 0), currency), tone="grand")
+    _totals_row("Total a pagar", _fmt_money(doc.get("total", 0), currency), tone="grand")
     if not is_quote:
-        _totals_row("Pagado acumulado" if kind == "pago" else "Pagado", _fmt_money(doc.get("paid_amount", 0) if is_note else doc.get("paid", 0), currency))
+        _totals_row("Pagado", _fmt_money(doc.get("paid", 0), currency))
         balance = doc.get("balance", 0) or 0
         _totals_row("Saldo pendiente", _fmt_money(balance, currency),
                     tone="outstanding" if balance > 0.001 else "settled")
-
-    pays = doc.get("payments") or []
-    if kind == "servicio" and pays:
-        py = min(ty, row_y) - 4 * mm
-        c.setFillColor(LIGHT); c.setFont("Helvetica-Bold", 7)
-        c.drawString(x + 3 * mm, py, "PAGOS RECIBIDOS")
-        c.setFillColor(INK_SOFT); c.setFont("Helvetica", 8)
-        for p in pays[:4]:
-            py -= 3.8 * mm
-            c.drawString(x + 3 * mm, py, f"{p.get('folio','')}  ·  {_fmt_date(p.get('date'))}  ·  {p.get('method','')}  ·  {_fmt_money(p.get('amount', 0), currency)}")
-        row_y = py - 2 * mm
 
     # ------------------- Notes -------------------
     notes = doc.get("notes")
@@ -501,10 +306,8 @@ def build_receipt_pdf(doc: dict, settings: dict, kind: str = "servicio", photos:
         c.setLineWidth(0)
         c.rect(x, notes_y + 4 * mm, 2, 1, stroke=0, fill=1)  # just to draw stripe below
 
-    if notes_y > 62 * mm:
-        _paragraph("Notas", notes)
-    if notes_y > 62 * mm:
-        _paragraph("Recomendaciones", recos)
+    _paragraph("Notas", notes)
+    _paragraph("Recomendaciones", recos)
 
     # ------------------- Signatures -------------------
     sig_y = 40 * mm
@@ -551,22 +354,88 @@ def build_receipt_pdf(doc: dict, settings: dict, kind: str = "servicio", photos:
 
     c.showPage()
 
+    # ------------------- Evidence annex (photos) -------------------
+    if photos:
+        page_w, page_h = LETTER
+        margin_x = 18 * mm
+        page_num = 0
+        for i in range(0, len(photos), 4):
+            page_num += 1
+            batch = photos[i:i + 4]
+            # Header
+            c.setFillColor(INK)
+            c.setFont("Helvetica-Bold", 14)
+            c.drawString(margin_x, page_h - 20 * mm, "EVIDENCIAS DEL SERVICIO")
+            c.setFillColor(MUTED)
+            c.setFont("Helvetica", 8)
+            c.drawString(margin_x, page_h - 26 * mm,
+                         f"Folio {doc.get('folio', '')}  ·  Página {page_num} de {(len(photos) + 3) // 4}")
+            c.setStrokeColor(RED)
+            c.setLineWidth(1.2)
+            c.line(margin_x, page_h - 29 * mm, page_w - margin_x, page_h - 29 * mm)
+
+            # 2x2 grid
+            cell_w = (page_w - 2 * margin_x - 6 * mm) / 2
+            cell_h = (page_h - 60 * mm - 6 * mm) / 2
+            grid_top = page_h - 34 * mm
+            for j, photo in enumerate(batch):
+                col = j % 2
+                row = j // 2
+                cx = margin_x + col * (cell_w + 6 * mm)
+                cy = grid_top - (row + 1) * cell_h - row * 6 * mm
+                c.setStrokeColor(RULE)
+                c.setLineWidth(0.6)
+                c.roundRect(cx, cy, cell_w, cell_h, 2 * mm, stroke=1, fill=0)
+                try:
+                    img = ImageReader(BytesIO(photo["bytes"]))
+                    iw, ih = img.getSize()
+                    # Fit inside cell keeping aspect
+                    pad = 3 * mm
+                    fit_w = cell_w - 2 * pad
+                    fit_h = cell_h - 10 * mm  # leave room for caption
+                    scale = min(fit_w / iw, fit_h / ih)
+                    draw_w = iw * scale
+                    draw_h = ih * scale
+                    dx = cx + (cell_w - draw_w) / 2
+                    dy = cy + cell_h - 7 * mm - draw_h
+                    c.drawImage(img, dx, dy, width=draw_w, height=draw_h, mask="auto")
+                except Exception:
+                    c.setFillColor(LIGHT)
+                    c.setFont("Helvetica-Oblique", 8)
+                    c.drawCentredString(cx + cell_w / 2, cy + cell_h / 2, "Imagen no disponible")
+                # Caption
+                caption = str(photo.get("caption") or "")[:80]
+                if caption:
+                    c.setFillColor(INK_SOFT)
+                    c.setFont("Helvetica", 7)
+                    c.drawString(cx + 3 * mm, cy + 4 * mm, caption)
+
+            # Footer
+            c.setStrokeColor(RULE)
+            c.line(margin_x, 22 * mm, page_w - margin_x, 22 * mm)
+            c.setFillColor(MUTED)
+            c.setFont("Helvetica", 7)
+            footer_note = settings.get("footer_note") or "Armenta's Motors Company"
+            c.drawCentredString(page_w / 2, 18 * mm, footer_note)
+            c.showPage()
+
     c.save()
     return buf.getvalue()
 
 
-def build_payment_receipt_pdf(p: dict, settings: dict) -> bytes:
-    svc = p.get("service") or {}
-    cur = settings.get("currency") or "MXN"
-    method = METHODS.get(p.get("method"), p.get("method") or "")
-    desc = f"Pago recibido · {method}" + (f" · Ref. {p['reference']}" if p.get("reference") else "")
-    if svc:
-        desc += f" · Orden {svc.get('folio', '')}"
-    doc = {
-        "folio": p.get("folio"), "status": "pagado", "created_at": p.get("date") or p.get("created_at"),
-        "client": p.get("client") or {}, "vehicle": {"make": p.get("vehicle")} if p.get("vehicle") else {},
-        "items": [{"description": desc, "quantity": 1, "unit_price": p.get("amount", 0)}],
-        "subtotal": p.get("amount", 0), "tax_rate": 0, "tax": 0, "total": p.get("amount", 0),
-        "paid": svc.get("paid", p.get("amount", 0)), "balance": svc.get("balance", 0), "notes": p.get("notes"),
-    }
-    return build_receipt_pdf(doc, settings, kind="pago")
+def _wrap(c: canvas.Canvas, text: str, font: str, size: float, max_w: float):
+    if not text:
+        return [""]
+    words = str(text).split()
+    lines, cur = [], ""
+    for w in words:
+        candidate = w if not cur else cur + " " + w
+        if c.stringWidth(candidate, font, size) <= max_w:
+            cur = candidate
+        else:
+            if cur:
+                lines.append(cur)
+            cur = w
+    if cur:
+        lines.append(cur)
+    return lines or [""]

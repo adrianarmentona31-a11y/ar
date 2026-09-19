@@ -1597,6 +1597,52 @@ async def _enrich_doc(kind: str, doc: dict) -> dict:
 RECEIPT_COLLECTIONS = {"servicio": "services", "cotizacion": "quotes", "nota": "notes"}
 
 
+async def _receipt_pdf_bytes(kind: str, doc_id: str) -> tuple[bytes, str]:
+    if kind == "pago":
+        p = await db.payments.find_one({"id": doc_id})
+        if not p: raise HTTPException(404, "Documento no encontrado")
+        return build_payment_receipt_pdf(await _payment_context(p), await _load_settings_dict()), p["folio"]
+    if kind not in RECEIPT_COLLECTIONS: raise HTTPException(400, "Tipo inválido")
+    doc = await db[RECEIPT_COLLECTIONS[kind]].find_one({"id": doc_id})
+    if not doc: raise HTTPException(404, "Documento no encontrado")
+    enriched = await _enrich_doc(kind, doc)
+    return build_receipt_pdf(enriched, await _load_settings_dict(), kind=kind), enriched.get("folio", "recibo")
+
+
+@api.get("/receipts/{kind}/{doc_id}/share-link")
+async def receipt_share_link(kind: str, doc_id: str, request: Request, user: dict = Depends(get_current_user)):
+    _pdf, folio = await _receipt_pdf_bytes(kind, doc_id)
+    exp = now_dt() + timedelta(days=30)
+    tok = jwt.encode({"type": "receipt", "kind": kind, "doc_id": doc_id, "exp": exp}, get_jwt_secret(), algorithm=JWT_ALGORITHM)
+    origin = request.headers.get("origin") or ""
+    referer = request.headers.get("referer") or ""
+    if origin.startswith("http"):
+        base = origin.rstrip("/")
+    elif referer.startswith("http"):
+        from urllib.parse import urlparse as _up
+        pr = _up(referer); base = f"{pr.scheme}://{pr.netloc}"
+    else:
+        base = str(request.base_url).rstrip("/")
+        fwd_proto = request.headers.get("x-forwarded-proto")
+        if fwd_proto and base.startswith("http://"):
+            base = fwd_proto + base[len("http"):]
+    url = f"{base}/api/public/receipts/{kind}/{doc_id}/{folio}.pdf?t={tok}"
+    return {"url": url, "path": f"/api/public/receipts/{kind}/{doc_id}/{folio}.pdf?t={tok}", "folio": folio, "expires_at": exp.isoformat()}
+
+
+@api.get("/public/receipts/{kind}/{doc_id}/{filename}")
+async def public_receipt_pdf(kind: str, doc_id: str, filename: str, t: str = Query(...)):
+    try:
+        payload = jwt.decode(t, get_jwt_secret(), algorithms=[JWT_ALGORITHM])
+    except jwt.PyJWTError:
+        raise HTTPException(401, "Liga inválida o expirada")
+    if payload.get("type") != "receipt" or payload.get("kind") != kind or payload.get("doc_id") != doc_id:
+        raise HTTPException(401, "Liga inválida")
+    pdf, folio = await _receipt_pdf_bytes(kind, doc_id)
+    return Response(content=pdf, media_type="application/pdf",
+                    headers={"Content-Disposition": f'inline; filename="{folio}.pdf"', "Cache-Control": "private, max-age=300"})
+
+
 @api.get("/receipts/pago/{pid}/pdf")
 async def payment_receipt_pdf(pid: str, user: dict = Depends(get_current_user)):
     p = await db.payments.find_one({"id": pid})
@@ -1837,9 +1883,7 @@ async def receipt_pdf(
     enriched = await _enrich_doc(kind, doc)
     settings = await _load_settings_dict()
 
-    photos_payload = await _service_photos_payload(doc_id) if (kind == "servicio" and include_photos) else None
-
-    pdf_bytes = build_receipt_pdf(enriched, settings, kind=kind, photos=photos_payload)
+    pdf_bytes = build_receipt_pdf(enriched, settings, kind=kind)
     filename = f"{enriched.get('folio', 'recibo')}.pdf"
     return Response(
         content=pdf_bytes,
@@ -1876,7 +1920,7 @@ async def send_service_receipt_email(sid: str, user: dict = Depends(require_staf
     if not client_email:
         raise HTTPException(400, "El cliente no tiene correo registrado")
     settings = await _load_settings_dict()
-    pdf_bytes = build_receipt_pdf(enriched, settings, kind="servicio", photos=await _service_photos_payload(sid))
+    pdf_bytes = build_receipt_pdf(enriched, settings, kind="servicio")
     folio = enriched.get("folio", "recibo")
     from html import escape as _esc
     client_name = _esc((enriched.get("client") or {}).get("nombre") or "")

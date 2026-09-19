@@ -6,6 +6,7 @@ import { api, formatApiError } from "../lib/api";
 import { useI18n } from "../context/I18nContext";
 import { fmtDate, fmtMoney } from "../lib/format";
 import { Modal, Field, Input, Textarea, Select, PageHeader, StatusBadge } from "../components/ui-kit";
+import { ShareReceipt } from "../components/ShareReceipt";
 
 function PaymentActions({ p, client, service, t }) {
   const [busy, setBusy] = useState("");
@@ -32,6 +33,7 @@ function PaymentActions({ p, client, service, t }) {
   };
   return (
     <div className="flex items-center justify-end gap-1.5">
+      <ShareReceipt kind="pago" id={p.id} folio={p.folio} clientName={client?.nombre} clientPhone={client?.telefono} compact />
       <button onClick={pdf} disabled={!!busy} title="PDF" className="h-8 w-8 rounded-md border border-[#262626] text-zinc-400 hover:text-white flex items-center justify-center" data-testid={`payment-pdf-${p.id}`}>{busy === "pdf" ? <span className="spinner" /> : <Download size={13} />}</button>
       <button onClick={wa} disabled={!client?.telefono} title="WhatsApp" className="h-8 w-8 rounded-md border border-emerald-800/60 text-emerald-300 flex items-center justify-center disabled:opacity-30" data-testid={`payment-wa-${p.id}`}><Send size={13} /></button>
       <button onClick={email} disabled={!!busy} title={client?.email || t.servicios.no_client_email} className={`h-8 w-8 rounded-md border flex items-center justify-center ${client?.email ? "border-sky-800/60 text-sky-300" : "border-[#262626] text-zinc-600"}`} data-testid={`payment-email-${p.id}`}>{busy === "email" ? <span className="spinner" /> : <Mail size={13} />}</button>

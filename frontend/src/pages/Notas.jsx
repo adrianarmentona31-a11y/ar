@@ -6,6 +6,7 @@ import { api, formatApiError } from "../lib/api";
 import { useI18n } from "../context/I18nContext";
 import { fmtDate, fmtMoney } from "../lib/format";
 import { Modal, Field, Input, Textarea, Select, PageHeader, StatusBadge } from "../components/ui-kit";
+import { ShareReceipt } from "../components/ShareReceipt";
 
 const emptyItem = () => ({ description: "", quantity: 1, unit_price: 0, cost: 0, is_labor: false });
 
@@ -151,6 +152,7 @@ export default function Notas() {
                 </div>
                 <div className="flex gap-2 flex-wrap">
                   <button onClick={() => navigate(`/recibo/nota/${n.id}`)} className="armenta-btn-ghost !h-9 !px-3 flex items-center gap-1.5 text-xs" data-testid={`note-receipt-${n.id}`}><ReceiptIcon size={12} />{t.servicios.view_receipt}</button>
+                  <ShareReceipt kind="nota" id={n.id} folio={n.folio} clientName={n.client_name} clientPhone={n.client_phone} compact />
                   <button onClick={() => wa(n)} disabled={!n.client_phone} className="h-9 px-3 rounded-lg border border-emerald-800/60 bg-emerald-950/30 text-emerald-300 flex items-center gap-1.5 text-xs disabled:opacity-40" data-testid={`note-wa-${n.id}`}><Send size={12} />WhatsApp</button>
                   <button onClick={() => email(n)} disabled={busy === n.id} className={`h-9 px-3 rounded-lg border flex items-center gap-1.5 text-xs ${n.client_email ? "border-sky-800/60 bg-sky-950/30 text-sky-300" : "border-[#262626] text-zinc-600"}`} data-testid={`note-email-${n.id}`}>{busy === n.id ? <span className="spinner" /> : <Mail size={12} />}Email</button>
                   <button onClick={() => del(n.id)} className="ml-auto text-zinc-600 hover:text-red-400" data-testid={`note-rm-${n.id}`}><Trash2 size={14} /></button>

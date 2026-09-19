@@ -162,6 +162,11 @@ export const extraTranslations = {
       survey_url: "Liga encuesta de satisfacción (Google Forms)",
       save: "Guardar cambios",
     },
+    share: {
+      share: "Compartir", copy_link: "Copiar liga", copied: "Liga copiada.", copied_msg: "Mensaje copiado; pégalo en Messenger.",
+      valid_30: "La liga del PDF es válida 30 días.",
+      msg_prefix: "Hola", msg_body: "aquí está tu recibo", msg_sign: "Armenta's Motors Company · Servicio automotriz a domicilio",
+    },
     equipo: {
       title: "Equipo y accesos", subtitle: "Solo las cuentas invitadas pueden entrar con Google.",
       role: "Rol", invite: "Invitar", name: "Nombre", invited: "Invitación creada. Ya puede entrar con Google.", removed: "Acceso eliminado.",
@@ -350,6 +355,11 @@ export const extraTranslations = {
       currency: "Currency", footer_note: "Receipt footer note",
       survey_url: "Satisfaction survey link (Google Forms)",
       save: "Save changes",
+    },
+    share: {
+      share: "Share", copy_link: "Copy link", copied: "Link copied.", copied_msg: "Message copied; paste it in Messenger.",
+      valid_30: "PDF link valid for 30 days.",
+      msg_prefix: "Hi", msg_body: "here is your receipt", msg_sign: "Armenta's Motors Company · Mobile automotive service",
     },
     equipo: {
       title: "Team & access", subtitle: "Only invited accounts can sign in with Google.",
