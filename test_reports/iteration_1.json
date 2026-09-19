@@ -1,0 +1,27 @@
+{
+  "summary": "ARMENTA OS Fase 1 verified end-to-end. Backend auth (login OK/401), and frontend full flow: unauth redirect, empty/wrong creds errors, password show/hide toggle, ES/EN toggle (login + header), successful login with 4 KPI cards, user badge 'Adrian Armenta / Administrador', session persistence on reload, quick action 'pendiente' toast, proximamente banner on module nav, logout, and post-logout route protection all pass.",
+  "tested_scope": ["frontend", "backend", "auth", "integration"],
+  "passed": [
+    "POST /api/auth/login with admin/armenta123 returns 200 + JWT + user(role=admin, email=adrianarmentona31@gmail.com)",
+    "Unauthenticated visit to /control redirects to /login",
+    "Empty credentials shows 'Ingresa usuario y contraseña.'",
+    "Wrong credentials shows 'Usuario o contraseña incorrectos.' in login-error-alert",
+    "Password show/hide toggle switches input type password<->text",
+    "Language toggle on login (login-language-toggle) changes UI text",
+    "Successful admin login redirects to /control and renders dashboard-page with all 4 KPI cards (servicios-hoy, cotizaciones, por-cobrar, estado-sistema)",
+    "Header user badge displays 'Adrian Armenta' + 'Administrador'",
+    "Session persists across page reload (stays on /control, no bounce to /login)",
+    "Quick action button action-btn-nuevo-servicio triggers 'pendiente' toast",
+    "Module nav (nav-item-clientes) renders module-proximamente-banner",
+    "Header language toggle (header-language-toggle) works",
+    "Header logout button (header-logout-button) logs out and redirects to /login",
+    "After logout, direct navigation to /control redirects back to /login",
+    "15 nav items rendered (sidebar/bottom-nav)"
+  ],
+  "failed": [],
+  "action_items": [],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "retest_needed": false,
+  "full_testing_deferred": true,
+  "notes": "Backend smoke re-verified via curl (login returns JWT + expected user shape). All 21 review-request criteria that were re-testable at UI/API level passed. Bcrypt hash format and admin-seed idempotency were not directly verified from within this test (no Mongo access executed), but main agent had already confirmed via curl and no duplicate-admin symptoms observed."
+}
