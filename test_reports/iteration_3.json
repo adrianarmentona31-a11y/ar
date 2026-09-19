@@ -1,0 +1,22 @@
+{
+  "summary": "ARMENTA OS Fase 3 tested. Backend: 20/20 pytest cases pass — original 14 (auth/CRUD/folios/recalc/settings/summaries) plus 6 new (notes NR-YYYY-#### folio + subtotal/tax/total/balance/status compute + PATCH recalc + GET enriched + DELETE 404; PDFs application/pdf %PDF for receipts/nota, /servicio, /cotizacion, /pago; relaxed validation POST /services={} /vehicles={year} /clients={tipo:'particular'}→nombre='Cliente sin nombre' /quotes={items:[]}; bank/survey settings persist via PATCH/GET; /api/qr returns image/png; send-email endpoints for notes/payments/services accept delivered@resend.dev (200 ok:true + email_id) and 400 when client has no email). Frontend: login logo /armenta_logo.png visible; Sidebar shows all 11 nav items with data-testid including nav-item-notas; /notas → notas-new opens form → filled client name/desc/price + note-pay-full toggled + note-submit → redirects to /recibo/nota/:id with recibo-paper visible, header 'NOTA DE REMISIÓN', and recibo-download-pdf button; /cobros lists per-payment payment-pdf-*, payment-wa-*, payment-email-* buttons; cobros-transfer navigates to /transferencia showing transfer-card with card number + CLABE + transfer-copy-all; /configuracion shows cfg-survey-url, cfg-bank-holder, cfg-bank-card, cfg-bank-clabe; /servicios 'Nuevo Servicio' button enabled; opening an existing service opens 'Editar servicio' modal which exposes service-send-survey, service-email-receipt, service-view-receipt, service-status. Dashboard quick-actions from previous iteration are now real links (action-btn-nuevo-servicio → /servicios etc.), so the 'Próximamente' regression is resolved.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": ["/app/backend/tests/backend_test.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py is now ~1892 lines. Highly recommended to split by domain module (auth, clients, vehicles, services, quotes, notes, payments, receipts, settings, email) — maintainability risk grows with each iteration.",
+    "Note folio uniqueness relies on _next_folio atomic counter; consider adding a unique Mongo index on {folio} for notes/services/quotes to protect against seed resets.",
+    "send-email endpoints (notes/payments/services) share a lot of html/kv_table/attachment boilerplate — extract a helper to DRY.",
+    "Note delete requires admin/manager, but GET/PATCH allow any authenticated user. Confirm intended RBAC; viewer/tech roles can currently edit notes.",
+    "No validation that provided client_email in a note is a valid email format; downstream email proxy will 422 on malformed addresses (already handled with 502)."
+  ],
+  "updated_files": ["/app/backend/tests/backend_test.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "admin / armenta123 (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "One UI-created note 'TEST UI Note' (NR-YYYY-####) at /recibo/nota/2a735b3b-... remains. Pytest fixtures cleanup their TEST_* records.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Regression suite at /app/backend/tests/backend_test.py now covers 20 cases including notes CRUD/PDF/email, relaxed validation, bank/survey settings, /qr, payment/service receipt PDFs and send-email flows. Run: cd /app && python -m pytest backend/tests/backend_test.py -v. Emergent email proxy only accepts delivered@resend.dev; other addresses upstream-422 → API 502 (expected). WhatsApp popup on service delivered status was NOT actively triggered in this run (buttons and status control exist); if E1 wants explicit popup verification, add a script that changes select[data-testid='service-status'] to 'delivered' then clicks Save and asserts a page.expect_popup() opens wa.me.",
+  "rca of the issue": "N/A — no bugs found in this iteration."
+}

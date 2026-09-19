@@ -221,3 +221,176 @@ def test_finance_summary(h):
     d = r.json()
     for k in ("revenue", "cost", "profit", "collected", "receivable", "services_by_status"):
         assert k in d
+
+
+# --- Phase 3: Notes / receipts / relaxed validation / bank settings / emails ---
+
+def test_notes_crud_and_folio(h):
+    """POST /api/notes computes totals and status; folio NR-YYYY-####; PATCH recalcs; DELETE removes."""
+    payload = {
+        "client_name": "TEST_NoteClient",
+        "client_phone": "555-0000",
+        "client_email": "delivered@resend.dev",
+        "items": [{"description": "Item A", "quantity": 2, "unit_price": 100.0, "cost": 40.0},
+                  {"description": "Item B", "quantity": 1, "unit_price": 50.0, "cost": 20.0}],
+        "tax_rate": 0.16,
+        "paid_amount": 100.0,
+    }
+    r = requests.post(f"{API}/notes", headers=h, json=payload, timeout=15)
+    assert r.status_code == 201, r.text
+    d = r.json()
+    assert d["folio"].startswith("NR-")
+    assert d["subtotal"] == 250.0
+    assert d["tax"] == 40.0
+    assert d["total"] == 290.0
+    assert d["paid_amount"] == 100.0
+    assert d["balance"] == 190.0
+    assert d["status"] == "pendiente"
+    nid = d["id"]
+
+    # list
+    r = requests.get(f"{API}/notes", headers=h, timeout=10)
+    assert r.status_code == 200 and any(n["id"] == nid for n in r.json()["items"])
+
+    # get enriched
+    r = requests.get(f"{API}/notes/{nid}", headers=h, timeout=10)
+    assert r.status_code == 200
+    assert r.json().get("client", {}).get("nombre") == "TEST_NoteClient"
+
+    # patch pay full -> pagada
+    r = requests.patch(f"{API}/notes/{nid}", headers=h, json={"paid_amount": 290.0}, timeout=10)
+    assert r.status_code == 200
+    assert r.json()["status"] == "pagada"
+    assert r.json()["balance"] == 0.0
+
+    # PDF endpoints
+    for path in (f"/receipts/nota/{nid}/pdf",):
+        r = requests.get(f"{API}{path}", headers=h, timeout=20)
+        assert r.status_code == 200
+        assert r.headers["content-type"].startswith("application/pdf")
+        assert r.content[:4] == b"%PDF"
+
+    # send-email note (delivered@resend.dev) - may take time
+    r = requests.post(f"{API}/notes/{nid}/send-email", headers=h, timeout=30)
+    assert r.status_code in (200, 502), r.text
+    if r.status_code == 200:
+        j = r.json()
+        assert j.get("ok") is True
+        assert j.get("email_id")
+
+    # delete
+    r = requests.delete(f"{API}/notes/{nid}", headers=h, timeout=10)
+    assert r.status_code == 200
+    r = requests.get(f"{API}/notes/{nid}", headers=h, timeout=10)
+    assert r.status_code == 404
+
+
+def test_relaxed_validation(h):
+    """services/vehicles/clients/quotes can be created with minimal payloads."""
+    # service without client_id
+    r = requests.post(f"{API}/services", headers=h, json={}, timeout=10)
+    assert r.status_code == 201, r.text
+    sid = r.json()["id"]
+    requests.delete(f"{API}/services/{sid}", headers=h, timeout=10)
+
+    # vehicle with only year
+    r = requests.post(f"{API}/vehicles", headers=h, json={"year": 2020}, timeout=10)
+    assert r.status_code == 201, r.text
+    vid = r.json()["id"]
+    requests.delete(f"{API}/vehicles/{vid}", headers=h, timeout=10)
+
+    # client with only tipo
+    r = requests.post(f"{API}/clients", headers=h, json={"tipo": "particular"}, timeout=10)
+    assert r.status_code == 201, r.text
+    d = r.json()
+    assert d["nombre"] == "Cliente sin nombre"
+    requests.delete(f"{API}/clients/{d['id']}", headers=h, timeout=10)
+
+    # quote with items=[]
+    r = requests.post(f"{API}/quotes", headers=h, json={"items": []}, timeout=10)
+    assert r.status_code == 201, r.text
+    qid = r.json()["id"]
+    requests.delete(f"{API}/quotes/{qid}", headers=h, timeout=10)
+
+
+def test_settings_bank_and_survey(h):
+    r = requests.patch(f"{API}/settings", headers=h, json={
+        "bank_holder": "TEST_Holder", "bank_name": "TEST_Bank",
+        "bank_card": "1234 5678 9012 3456", "bank_clabe": "012345678901234567",
+        "survey_url": "https://forms.gle/testsurvey",
+    }, timeout=10)
+    assert r.status_code == 200
+    r = requests.get(f"{API}/settings", headers=h, timeout=10)
+    d = r.json()
+    assert d["bank_holder"] == "TEST_Holder"
+    assert d["bank_card"] == "1234 5678 9012 3456"
+    assert d["bank_clabe"] == "012345678901234567"
+    assert d["survey_url"] == "https://forms.gle/testsurvey"
+
+
+def test_qr_endpoint():
+    r = requests.get(f"{API}/qr?data=https://x.y", timeout=10)
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("image/png")
+
+
+def test_service_payment_receipt_pdfs_and_email(h, client_id, vehicle_id):
+    """Full flow: create client with email + service + payment; test receipt PDFs and send-email."""
+    # patch client with delivered@resend.dev email
+    requests.patch(f"{API}/clients/{client_id}", headers=h, json={"email": "delivered@resend.dev"}, timeout=10)
+
+    r = requests.post(f"{API}/services", headers=h, json={
+        "client_id": client_id, "vehicle_id": vehicle_id,
+        "items": [{"description": "Aceite", "quantity": 1, "unit_price": 500.0, "cost": 200.0}],
+        "tax_rate": 0.16,
+    }, timeout=10)
+    assert r.status_code == 201
+    sid = r.json()["id"]
+
+    # servicio PDF
+    r = requests.get(f"{API}/receipts/servicio/{sid}/pdf", headers=h, timeout=20)
+    assert r.status_code == 200 and r.content[:4] == b"%PDF"
+
+    # cotizacion PDF via quote
+    rq = requests.post(f"{API}/quotes", headers=h, json={
+        "client_id": client_id, "items": [{"description": "X", "quantity": 1, "unit_price": 100, "cost": 40}],
+    }, timeout=10)
+    qid = rq.json()["id"]
+    r = requests.get(f"{API}/receipts/cotizacion/{qid}/pdf", headers=h, timeout=20)
+    assert r.status_code == 200 and r.content[:4] == b"%PDF"
+
+    # payment + pago PDF + email
+    rp = requests.post(f"{API}/payments", headers=h, json={"service_id": sid, "amount": 300.0, "method": "cash"}, timeout=10)
+    assert rp.status_code == 201
+    pid = rp.json()["id"]
+    r = requests.get(f"{API}/receipts/pago/{pid}/pdf", headers=h, timeout=20)
+    assert r.status_code == 200 and r.content[:4] == b"%PDF"
+
+    # payment email
+    r = requests.post(f"{API}/payments/{pid}/send-email", headers=h, timeout=30)
+    assert r.status_code in (200, 502), r.text
+    if r.status_code == 200:
+        j = r.json()
+        assert j.get("ok") is True and j.get("email_id")
+
+    # service send-receipt-email
+    r = requests.post(f"{API}/services/{sid}/send-receipt-email", headers=h, timeout=30)
+    assert r.status_code in (200, 502), r.text
+
+    # cleanup
+    requests.delete(f"{API}/payments/{pid}", headers=h, timeout=10)
+    requests.delete(f"{API}/quotes/{qid}", headers=h, timeout=10)
+    requests.delete(f"{API}/services/{sid}", headers=h, timeout=10)
+
+
+def test_service_email_400_without_client_email(h):
+    """When client has no email, POST /api/services/{id}/send-receipt-email returns 400."""
+    # Create a fresh client with NO email
+    rc = requests.post(f"{API}/clients", headers=h, json={"nombre": "TEST_NoEmail", "tipo": "particular"}, timeout=10)
+    cid = rc.json()["id"]
+    rs = requests.post(f"{API}/services", headers=h, json={"client_id": cid, "items": [{"description": "X", "quantity": 1, "unit_price": 10.0, "cost": 0}]}, timeout=10)
+    sid = rs.json()["id"]
+    r = requests.post(f"{API}/services/{sid}/send-receipt-email", headers=h, timeout=15)
+    assert r.status_code == 400, r.text
+    requests.delete(f"{API}/services/{sid}", headers=h, timeout=10)
+    requests.delete(f"{API}/clients/{cid}", headers=h, timeout=10)

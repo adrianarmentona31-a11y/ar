@@ -46,6 +46,16 @@ Route `/recibo/:kind/:id` (kind = cotizacion | servicio). Renders professional p
 ### Encuestas de satisfacción (COMPLETED · 2026-09-19 · v2 Google Forms)
 El usuario ya tiene un Google Form; se REEMPLAZÓ el módulo interno. `settings.survey_url` (default = liga del Google Form del usuario, editable en Configuración). Botón "Enviar encuesta" en un servicio existente abre WhatsApp al teléfono del cliente con la liga y copia la liga. QR de la encuesta impreso en el recibo PDF (junto a firmas) y en la vista web del recibo (`GET /api/qr?data=` genera PNG con `qrcode`). Archivos: `lib/surveyLink.js`, `pages/Servicios.jsx` (SurveyButton), `pages/Recibo.jsx`, `pdf_receipt.py`.
 
+### Fase 3 (COMPLETED · 2026-09-19)
+- **Email con PDF adjunto** (Emergent email proxy, `email_service.py`, `EMAIL_FROM_NAME` en .env): `POST /api/services/{id}/send-receipt-email`, `POST /api/payments/{id}/send-email`, `POST /api/notes/{id}/send-email`. Requiere email del cliente; solo `delivered@resend.dev` sirve para pruebas.
+- **Encuesta automática**: al guardar un servicio que pasa a "Entregado" se abre WhatsApp con la liga de Google Forms (Servicios.jsx submit).
+- **Notas de remisión** (`/notas`, colección `notes`, folio NR-YYYY-####): ticket rápido sin orden; cliente libre o existente; pagado/saldo/estatus; PDF `/api/receipts/nota/{id}/pdf`; recibo web `/recibo/nota/:id`; WhatsApp resumen; email.
+- **Recibo de pago**: `GET /api/receipts/pago/{id}/pdf` + email + WhatsApp desde tabla Cobros (`PaymentActions`).
+- **Validación relajada**: services/quotes/vehicles sin `client_id`; vehicles sin make/model; clients sin nombre → "Cliente sin nombre". Botones "Nuevo" siempre habilitados.
+- **Nuevo diseño PDF** (`pdf_receipt.py`, estilo sencillo solicitado por el usuario: logo en caja negra, título, tabla de datos, DETALLE DE SERVICIOS, totales con TOTAL en negro, CONDICIONES Y GARANTÍA, QR encuesta al pie, paginación automática). Recibo web (`Recibo.jsx`) replica el encabezado.
+- **Datos de transferencia** (`/transferencia`, `Transferencia.jsx` + `transferencia.css`): tarjeta oscura premium con titular, tarjeta, CLABE (settings `bank_holder/bank_name/bank_card/bank_clabe`, editables en Configuración), copiar y enviar por WhatsApp. Acceso desde Cobros.
+- **Logos**: `public/armenta_logo.png` (hex + wordmark, bordes difuminados) en Login; `armenta_hex.png` recortado del nuevo logo; `armenta_wordmark.png` (óvalo) sin fondo rectangular, usado en PDF/recibo/transferencia.
+
 ## Backend Endpoints
 Auth: `/api/auth/{login,me,logout}`. Clients, Companies, Vehicles, Technicians, Quotes, Services, Payments — all with POST/GET list/GET one/PATCH/DELETE. Dashboard: `/api/dashboard/summary`. Finance: `/api/finance/summary`. Settings: `/api/settings`.
 
@@ -56,9 +66,9 @@ DB: MongoDB with unique `id` indexes across every collection + folio counters co
 
 ## Next Backlog (P2/P3)
 - P1 Compresión de fotos (máx 1600px) al subir evidencias.
-- P1 Envío de recibo PDF por email (Resend vía integration playbook).
 - P2 Recordatorios de kilometraje (cron 6 meses / 10,000 km) + WhatsApp automatizado.
-- P2 Envío automático de encuesta al marcar servicio como "entregado".
+- P2 Cartera vencida (saldos por cliente con días de atraso).
+- P2 QR de encuesta en cotizaciones aprobadas / alerta de detractores.
 - RFC-grouped fleet consolidation view.
 - Splash screen with hex animation.
 
