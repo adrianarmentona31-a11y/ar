@@ -51,6 +51,7 @@ export default function Configuracion() {
           <Field label={t.configuracion.currency}><Input testId="cfg-currency" value={f.currency} onChange={set("currency")} /></Field>
         </div>
         <Field label={t.configuracion.footer_note}><Textarea testId="cfg-footer" value={f.footer_note} onChange={set("footer_note")} rows={3} /></Field>
+        <Field label={t.configuracion.survey_url}><Input testId="cfg-survey-url" value={f.survey_url} onChange={set("survey_url")} placeholder="https://docs.google.com/forms/..." /></Field>
         <button type="submit" className="armenta-btn-primary !w-auto !h-12 !px-6 flex items-center gap-2" disabled={saving} data-testid="cfg-save">
           <Save size={14} />{saving ? t.common.saving : t.configuracion.save}
         </button>

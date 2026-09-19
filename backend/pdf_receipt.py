@@ -323,6 +323,27 @@ def build_receipt_pdf(doc: dict, settings: dict, kind: str = "servicio", photos:
                         f"CLIENTE / {(client.get('nombre') or '').upper()}")
 
     # ------------------- Footer -------------------
+    survey_url = (settings.get("survey_url") or "").strip()
+    if survey_url:
+        from reportlab.graphics.barcode import qr as _qr
+        from reportlab.graphics.shapes import Drawing
+        from reportlab.graphics import renderPDF
+        qsize = 20 * mm
+        widget = _qr.QrCodeWidget(survey_url)
+        bx, by, bw, bh = widget.getBounds()
+        d = Drawing(qsize, qsize, transform=[qsize / (bw - bx), 0, 0, qsize / (bh - by), 0, 0])
+        d.add(widget)
+        qx = page_w - margin_x - qsize
+        qy = sig_y + 10 * mm
+        renderPDF.draw(d, c, qx, qy)
+        c.setFillColor(INK)
+        c.setFont("Helvetica-Bold", 7)
+        c.drawRightString(qx - 3 * mm, qy + qsize - 4 * mm, "¿CÓMO FUE TU SERVICIO?")
+        c.setFillColor(MUTED)
+        c.setFont("Helvetica", 6.5)
+        c.drawRightString(qx - 3 * mm, qy + qsize - 8 * mm, "Escanea y califícanos en 1 minuto.")
+        c.drawRightString(qx - 3 * mm, qy + qsize - 11.5 * mm, "Tu opinión nos ayuda a mejorar.")
+
     c.setStrokeColor(RULE)
     c.line(x, 22 * mm, page_w - margin_x, 22 * mm)
     c.setFillColor(MUTED)

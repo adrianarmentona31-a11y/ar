@@ -6,18 +6,20 @@ import { api, formatApiError } from "../lib/api";
 import { useI18n } from "../context/I18nContext";
 import { fmtDate, fmtMoney } from "../lib/format";
 import { Modal, Field, Input, Textarea, Select, PageHeader, StatusBadge } from "../components/ui-kit";
-import { createSurveyLink, whatsappSurveyUrl } from "../lib/surveyLink";
+import { whatsappSurveyUrl } from "../lib/surveyLink";
 
-function SurveyButton({ serviceId }) {
+function SurveyButton({ service }) {
   const { t } = useI18n();
   const [busy, setBusy] = useState(false);
   const send = async () => {
     setBusy(true);
     try {
-      const s = await createSurveyLink(serviceId);
-      try { await navigator.clipboard.writeText(s.url); } catch { /* clipboard may be blocked */ }
+      const { data: settings } = await api.get("/settings");
+      if (!settings.survey_url) return toast.error(t.encuestas.missing_url);
+      const url = whatsappSurveyUrl({ clientName: service.client?.nombre, clientPhone: service.client?.telefono, folio: service.folio, surveyUrl: settings.survey_url });
+      try { await navigator.clipboard.writeText(settings.survey_url); } catch { /* clipboard may be blocked */ }
       toast.success(t.encuestas.link_ready);
-      window.open(whatsappSurveyUrl(s, s.url), "_blank", "noopener");
+      window.open(url, "_blank", "noopener");
     } catch (e) { toast.error(formatApiError(e)); }
     finally { setBusy(false); }
   };
@@ -347,7 +349,7 @@ function ServiceForm({ initial, clients, vehicles, technicians, onClose, onSaved
         <div className="flex flex-col sm:flex-row gap-2 pt-1">
           <button type="submit" className="armenta-btn-primary flex-1 !h-12" disabled={saving} data-testid="service-submit">{saving ? t.common.saving : t.common.save}</button>
           {editing && <Link to={`/recibo/servicio/${initial.id}`} className="h-12 px-4 rounded-lg border border-[#dc262666] bg-[#dc262614] text-[#dc2626] hover:bg-[#dc262622] flex items-center justify-center gap-2 text-sm font-semibold" data-testid="service-view-receipt"><ReceiptIcon size={14} />{t.servicios.view_receipt}</Link>}
-          {editing && <SurveyButton serviceId={initial.id} />}
+          {editing && <SurveyButton service={initial} />}
           {editing && <button type="button" onClick={doDelete} className="h-12 px-4 rounded-lg border border-red-900/60 bg-red-950/30 text-red-300 flex items-center gap-2 text-sm"><Trash2 size={14} />{t.common.delete}</button>}
           <button type="button" onClick={onClose} className="armenta-btn-ghost !h-12 !px-4">{t.common.cancel}</button>
         </div>

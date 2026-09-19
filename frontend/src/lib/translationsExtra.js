@@ -109,13 +109,8 @@ export const extraTranslations = {
       saved: "Servicio guardado.", deleted: "Servicio eliminado.",
     },
     encuestas: {
-      title: "Encuestas", subtitle: "Satisfacción del cliente",
-      sent: "Enviadas", answered_lower: "respondidas", response_rate: "Tasa de respuesta",
-      avg_rating: "Calificación prom.", promoters: "promotores", detractors: "detractores",
-      filters: { all: "Todas", pending: "Pendiente", answered: "Respondida" },
-      empty: "Aún no hay encuestas. Envíalas desde un servicio terminado.",
-      copy: "Copiar liga", copied: "Liga copiada.", deleted: "Encuesta eliminada.",
-      link_ready: "Liga de encuesta lista y copiada.",
+      link_ready: "Liga de Google Forms copiada. Abriendo WhatsApp…",
+      missing_url: "Configura la liga de la encuesta en Configuración.",
     },
     cotizaciones: {
       title: "Cotizaciones", subtitle: "Presupuestos emitidos",
@@ -157,6 +152,7 @@ export const extraTranslations = {
       company_phone: "Teléfono", company_email: "Email",
       company_address: "Dirección", tax_rate: "Tasa IVA (0.16 = 16%)",
       currency: "Moneda", footer_note: "Nota al pie del recibo",
+      survey_url: "Liga encuesta de satisfacción (Google Forms)",
       save: "Guardar cambios",
     },
     recibo: {
@@ -185,6 +181,9 @@ export const extraTranslations = {
       not_found: "Documento no encontrado.",
       thanks: "Gracias por confiar en ARMENTA'S MOTORS.",
       auth: "Firma / autorización",
+      survey_title: "¿Cómo fue tu servicio?",
+      survey_hint: "Escanea el QR y califícanos en 1 minuto.",
+      survey_open: "Abrir encuesta",
     },
   },
   en: {
@@ -270,13 +269,8 @@ export const extraTranslations = {
       saved: "Service saved.", deleted: "Service deleted.",
     },
     encuestas: {
-      title: "Surveys", subtitle: "Customer satisfaction",
-      sent: "Sent", answered_lower: "answered", response_rate: "Response rate",
-      avg_rating: "Avg. rating", promoters: "promoters", detractors: "detractors",
-      filters: { all: "All", pending: "Pending", answered: "Answered" },
-      empty: "No surveys yet. Send them from a completed service.",
-      copy: "Copy link", copied: "Link copied.", deleted: "Survey deleted.",
-      link_ready: "Survey link ready and copied.",
+      link_ready: "Google Forms link copied. Opening WhatsApp…",
+      missing_url: "Set the survey link in Settings.",
     },
     cotizaciones: {
       title: "Quotations", subtitle: "Estimates issued",
@@ -318,6 +312,7 @@ export const extraTranslations = {
       company_phone: "Phone", company_email: "Email",
       company_address: "Address", tax_rate: "Tax rate (0.16 = 16%)",
       currency: "Currency", footer_note: "Receipt footer note",
+      survey_url: "Satisfaction survey link (Google Forms)",
       save: "Save changes",
     },
     recibo: {
@@ -346,6 +341,9 @@ export const extraTranslations = {
       not_found: "Document not found.",
       thanks: "Thank you for trusting ARMENTA'S MOTORS.",
       auth: "Signature / authorization",
+      survey_title: "How was your service?",
+      survey_hint: "Scan the QR and rate us in 1 minute.",
+      survey_open: "Open survey",
     },
   },
 };

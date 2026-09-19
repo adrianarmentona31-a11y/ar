@@ -256,6 +256,16 @@ export default function Recibo() {
         <div className="receipt-footer">
           {settings?.footer_note || t.recibo.thanks}
         </div>
+        {settings?.survey_url && (
+          <div className="receipt-survey" data-testid="recibo-survey-qr">
+            <img src={`${process.env.REACT_APP_BACKEND_URL}/api/qr?data=${encodeURIComponent(settings.survey_url)}`} alt="QR encuesta" width={88} height={88} />
+            <div>
+              <div className="receipt-label">{t.recibo.survey_title}</div>
+              <div className="receipt-sub">{t.recibo.survey_hint}</div>
+              <a href={settings.survey_url} target="_blank" rel="noreferrer" className="receipt-sub print-hidden underline" data-testid="recibo-survey-link">{t.recibo.survey_open}</a>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

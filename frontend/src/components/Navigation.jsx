@@ -11,7 +11,6 @@ import {
   HardHat,
   Building2,
   Settings,
-  MessageSquareHeart,
 } from "lucide-react";
 import { useI18n } from "../context/I18nContext";
 
@@ -25,7 +24,6 @@ export const NAV_ITEMS = [
   { key: "finanzas", to: "/finanzas", icon: LineChart, testId: "nav-item-finanzas", enabled: true },
   { key: "tecnicos", to: "/tecnicos", icon: HardHat, testId: "nav-item-tecnicos", enabled: true },
   { key: "empresas", to: "/empresas", icon: Building2, testId: "nav-item-empresas", enabled: true },
-  { key: "encuestas", to: "/encuestas", icon: MessageSquareHeart, testId: "nav-item-encuestas", enabled: true },
   { key: "configuracion", to: "/configuracion", icon: Settings, testId: "nav-item-configuracion", enabled: true },
 ];
 

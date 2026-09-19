@@ -294,6 +294,20 @@
     color: #71717a;
 }
 
+.receipt-survey {
+    margin-top: 18px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 14px;
+    border: 1px solid #e4e4e7;
+    border-left: 3px solid #dc2626;
+    border-radius: 8px;
+    background: #fafafa;
+}
+.receipt-survey img { border-radius: 4px; flex-shrink: 0; }
+
+
 /* Print styles */
 @media print {
     body {
