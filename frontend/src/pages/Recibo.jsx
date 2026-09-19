@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Printer, ArrowLeft } from "lucide-react";
+import { Printer, ArrowLeft, Download } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatApiError } from "../lib/api";
 import { useI18n } from "../context/I18nContext";
@@ -21,6 +21,30 @@ export default function Recibo() {
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+
+  const downloadPdf = async () => {
+    setDownloading(true);
+    try {
+      const res = await api.get(`/receipts/${kind}/${id}/pdf`, {
+        responseType: "blob",
+      });
+      const blob = new Blob([res.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      const suggested = res.headers?.["x-filename"] || `${doc?.folio || "recibo"}.pdf`;
+      link.download = suggested;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => window.URL.revokeObjectURL(url), 250);
+    } catch (e) {
+      toast.error(formatApiError(e));
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   useEffect(() => {
     (async () => {
@@ -69,9 +93,15 @@ export default function Recibo() {
   return (
     <div className="max-w-4xl mx-auto space-y-4" data-testid="recibo-page">
       {/* Toolbar (screen only) */}
-      <div className="flex items-center justify-between print-hidden">
+      <div className="flex items-center justify-between print-hidden gap-2 flex-wrap">
         <button onClick={() => navigate(-1)} className="armenta-btn-ghost !h-11 !px-4 flex items-center gap-2" data-testid="recibo-back"><ArrowLeft size={14} />{t.recibo.back}</button>
-        <button onClick={() => window.print()} className="armenta-btn-primary !w-auto !h-11 !px-5 flex items-center gap-2" data-testid="recibo-print"><Printer size={14} />{t.recibo.print}</button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => window.print()} className="armenta-btn-ghost !h-11 !px-4 flex items-center gap-2" data-testid="recibo-print"><Printer size={14} />{t.recibo.print}</button>
+          <button onClick={downloadPdf} disabled={downloading} className="armenta-btn-primary !w-auto !h-11 !px-5 flex items-center gap-2" data-testid="recibo-download-pdf">
+            {downloading ? <span className="spinner" /> : <Download size={14} />}
+            {downloading ? t.recibo.generating_pdf : t.recibo.download_pdf}
+          </button>
+        </div>
       </div>
 
       {/* Paper */}

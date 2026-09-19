@@ -13,10 +13,13 @@ from typing import Optional, Literal, List
 import bcrypt
 import jwt
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request
+from fastapi.responses import Response
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field, EmailStr, ConfigDict
+
+from pdf_receipt import build_receipt_pdf
 
 # ---------------------------------------------------------------------------
 # Config
@@ -1075,6 +1078,56 @@ async def finance_summary(user: dict = Depends(get_current_user)):
 @api.get("/health")
 async def health():
     return {"status": "ok", "service": "armenta-os", "phase": "2+"}
+
+
+# ---------------------------------------------------------------------------
+# RECIBOS EN PDF
+# ---------------------------------------------------------------------------
+async def _load_settings_dict() -> dict:
+    doc = await db.settings.find_one({"_id": "singleton"})
+    if not doc:
+        doc = dict(DEFAULT_SETTINGS)
+    doc.pop("_id", None)
+    return doc
+
+
+async def _enrich_doc(kind: str, doc: dict) -> dict:
+    out = _clean_doc(doc)
+    # Convert datetimes back for the PDF renderer (accepts str/datetime)
+    if isinstance(out.get("created_at"), datetime):
+        out["created_at"] = out["created_at"].isoformat()
+    if doc.get("client_id"):
+        c = await db.clients.find_one({"id": doc["client_id"]})
+        if c: out["client"] = {k: _clean_doc(c).get(k) for k in ("id", "tipo", "nombre", "telefono", "email", "direccion")}
+    if doc.get("vehicle_id"):
+        v = await db.vehicles.find_one({"id": doc["vehicle_id"]})
+        if v: out["vehicle"] = {k: _clean_doc(v).get(k) for k in ("id", "year", "make", "model", "engine", "vin", "plates", "mileage", "color")}
+    if kind == "servicio" and doc.get("technician_id"):
+        t = await db.technicians.find_one({"id": doc["technician_id"]})
+        if t: out["technician"] = {"id": t["id"], "name": t.get("name", "")}
+    return out
+
+
+@api.get("/receipts/{kind}/{doc_id}/pdf")
+async def receipt_pdf(kind: str, doc_id: str, user: dict = Depends(get_current_user)):
+    if kind not in ("servicio", "cotizacion"):
+        raise HTTPException(status_code=400, detail="Tipo inválido")
+    coll = db.services if kind == "servicio" else db.quotes
+    doc = await coll.find_one({"id": doc_id})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Documento no encontrado")
+    enriched = await _enrich_doc(kind, doc)
+    settings = await _load_settings_dict()
+    pdf_bytes = build_receipt_pdf(enriched, settings, kind=kind)
+    filename = f"{enriched.get('folio', 'recibo')}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'inline; filename="{filename}"',
+            "X-Filename": filename,
+        },
+    )
 
 
 # ---------------------------------------------------------------------------
