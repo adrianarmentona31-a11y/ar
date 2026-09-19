@@ -4,7 +4,8 @@ import { Eye, EyeOff, User, Lock, Globe, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../context/I18nContext";
-import { BrandMark, BrandWordmark } from "../components/BrandMark";
+import { BrandMark } from "../components/BrandMark";
+import { ArmentaWordmark } from "../components/ArmentaWordmark";
 
 export default function Login() {
   const { login, isAuthenticated, isInitializing } = useAuth();
@@ -60,14 +61,9 @@ export default function Login() {
 
         <div className="w-full max-w-md">
           <div className="flex flex-col items-center mb-8">
-            <BrandMark size={72} glow className="mb-4" />
-            <span className="font-mono-tactical text-[10px] uppercase tracking-[0.28em] text-zinc-500">
-              {t.brand.company}
-            </span>
-            <h1 className="text-3xl sm:text-4xl mt-1">
-              <BrandWordmark className="text-white" />
-            </h1>
-            <p className="text-xs text-zinc-500 mt-2 font-mono-tactical tracking-wider uppercase">
+            <BrandMark size={68} glow className="mb-4" />
+            <ArmentaWordmark width={280} className="mb-1" />
+            <p className="text-xs text-zinc-500 mt-1 font-mono-tactical tracking-[0.28em] uppercase">
               {t.brand.tagline}
             </p>
           </div>

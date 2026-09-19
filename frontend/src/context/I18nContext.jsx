@@ -4,9 +4,11 @@ import {
   DEFAULT_LOCALE,
   SUPPORTED_LOCALES,
 } from "../lib/translations";
+import { mergeTranslations } from "../lib/translationsExtra";
 import { storage, STORAGE_KEYS } from "../lib/storage";
 
 const I18nContext = createContext(null);
+const merged = mergeTranslations(translations);
 
 export function I18nProvider({ children }) {
   const [locale, setLocaleState] = useState(() => {
@@ -27,7 +29,7 @@ export function I18nProvider({ children }) {
   const value = useMemo(
     () => ({
       locale,
-      t: translations[locale],
+      t: merged[locale],
       setLocale,
       toggle,
       supported: SUPPORTED_LOCALES,

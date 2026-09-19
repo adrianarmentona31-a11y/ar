@@ -1,72 +1,62 @@
 # ARMENTA OS — Product Requirements Document
 
 ## Business Context
-ARMENTA'S MOTORS is a Mexican mobile automotive service company (Ciudad Juárez). Field technicians drive an equipped mobile unit to clients (individuals, companies, fleets, auction lots) to perform diagnostics, tuneups, mechanical repairs, engine & transmission service, pre-purchase inspections, and recurring preventive maintenance.
+ARMENTA'S MOTORS is a Mexican mobile automotive service company (Ciudad Juárez). Field technicians drive an equipped mobile unit to clients (individuals, companies, fleets, auction lots).
 
-ARMENTA OS is the operating system of the business. It must eventually control the full flow:
-CLIENT → VEHICLE → DIAGNOSTIC → QUOTE → APPROVAL → PARTS → WORK ORDER → SERVICE → EVIDENCE → PAYMENT → PROFIT → FOLLOW-UP → NEXT SERVICE.
+## Brand System (implemented)
+- **Brand Mark**: hexagonal SVG with red outer rim, obsidian body, chrome-silver "A" monogram — `components/BrandMark.jsx`
+- **Wordmark**: SVG faithful to the identity system — chrome oval with red sports car silhouette, "ARMENTA'S" in chrome + "MOTORS" in red — `components/ArmentaWordmark.jsx`
+- **Palette**: obsidian #070707/#101010, red #DC2626/#EF4444, silver #E5E7EB, status greens/ambers
 
-## User Personas
-- **Admin / Owner** (Adrian Armenta): full control, finances, billing, customer master.
-- **Manager**: schedules, quotations, receivables.
-- **Field Technician**: works on-site with phone in hand, needs one-handed mobile UX.
-- **Assistant**: data entry, follow-ups.
-- **Viewer**: read-only access (partners, accountants).
+## Phases Implemented (2026-02)
 
-## Core Non-Functional Requirements
-- Mobile-first, single-handed operation with gloved hands.
-- Bilingual ES/EN.
-- Dark obsidian + metallic gold aesthetic. Premium automotive, sober, industrial.
-- Zero fake functionality. Unimplemented features must show "Próximamente".
-- Architecture ready for API + DB + real auth + roles from day one.
+### Phase 1 — Núcleo (COMPLETED)
+JWT auth, admin seed, protected routes, i18n ES/EN, mobile-first shell, session persistence.
 
-## Phase 1 — Núcleo Funcional (COMPLETED — 2026-02)
-Implemented end-to-end:
-- **Backend** (`/app/backend/server.py`)
-  - FastAPI + Motor (MongoDB).
-  - `POST /api/auth/login` (identifier = username or email + password) → JWT (7d TTL).
-  - `GET  /api/auth/me` (Bearer).
-  - `POST /api/auth/logout`.
-  - `GET  /api/dashboard/summary` (returns real zeroes — no fake data).
-  - `GET  /api/health`.
-  - bcrypt password hashing, unique indexes on users.username / users.email, idempotent admin seed on startup pulled from `.env` (`ADMIN_USERNAME=admin`, `ADMIN_EMAIL=adrianarmentona31@gmail.com`, `ADMIN_PASSWORD=armenta123`).
-  - Roles enum: admin, manager, technician, assistant, viewer (ready for RBAC).
-- **Frontend** (`/app/frontend/src/`)
-  - React 19 + react-router-dom v7.
-  - `context/AuthContext` (initializing / authenticated / anonymous states, rehydrates from localStorage then verifies with `/auth/me`).
-  - `context/I18nContext` (ES default, EN toggle, persisted).
-  - `lib/storage` — thin abstraction ready to swap for cookie-based store.
-  - `lib/api` — axios instance with bearer interceptor and FastAPI detail normalizer.
-  - Pages: `Login`, `Dashboard` (Control), `ModulePlaceholder` (all future modules).
-  - `AppShell` with sticky header (session badge, ES/EN toggle, user badge, logout) + desktop `Sidebar` + mobile `BottomNav`.
-  - Full data-testid coverage per design guidelines.
-- **Design**: obsidian #070707 / #101010 / #161616, gold #C9A45C accent, Barlow Condensed headings, Inter body, JetBrains Mono for tactical labels, pulse-dot session indicator, gold-glow CTAs, mobile bottom nav ≥48px tap targets.
-- **Session persistence**: localStorage key `armenta_os_session_v1` — survives full browser restart. Session verified against backend on load.
+### Phase 2 — Clientes (COMPLETED)
+Full CRUD (particular/empresa/lote), search, filters.
 
-## Data Model (scaffolded conceptually, tables to be created per phase)
-- User (implemented)
-- Client (particular / empresa / lote)
-- Vehicle (year, make, model, engine, VIN, plates, mileage, drive, nextServiceDate/Km)
-- Service (states: lead / diagnostic / quoted / approved / scheduled / in_progress / completed / delivered / cancelled)
-- Quote (states: draft / sent / approved / rejected / expired)
-- Payment (cash / transfer / card / other)
-- Company (with paymentTerms + creditLimit)
-- Technician (with commissionType/value)
-- Part (with cost, salePrice, stock, minimumStock)
+### Phase 3 — Vehículos (COMPLETED)
+Bound to client, VIN/plates uppercase, mileage, next-service reminder fields.
 
-## Phase 2+ Backlog (prioritized)
-- **P0 · Fase 2** Clients module (CRUD, particular/empresa/lote types, contact info).
-- **P0 · Fase 3** Vehicles module (bound to client, VIN, mileage log — foundation for "kilometraje inteligente").
-- **P0 · Fase 4** Services (work orders, technician assignment, status machine, evidence uploads).
-- **P1 · Fase 5** Quotations (line items, tax breakdown, PDF export).
-- **P1 · Fase 6** Payments & receivables.
-- **P1 · Fase 7** Finance & profit reports (part cost vs. sale price margin).
-- **P2 · Fase 8** Technicians & commissions.
-- **P2 · Fase 9** Companies / fleets consolidation by RFC (multi-vehicle rollup).
-- **P2 · Fase 10** WhatsApp reminders, AI predictive maintenance, campaigns.
+### Phase 4 — Servicios (COMPLETED)
+Work orders with folio auto-generation (OS-YYYY-####), 9-state machine (lead → delivered), items editor with cost tracking + profit, status filters, quick access to receipt.
 
-## Testing
-Admin auto-seeded, verified end-to-end via curl: login OK, login bad-credentials 401, login by email, /auth/me with Bearer, /dashboard/summary, unauthenticated /me returns 401.
+### Phase 5 — Cotizaciones (COMPLETED)
+Folio auto (COT-YYYY-####), items with cost, subtotal/IVA/total auto-compute, valid-days expiry, 5 statuses (draft/sent/approved/rejected/expired), receipt preview.
+
+### Phase 6 — Cobros / Pagos (COMPLETED)
+Folio auto (PAG-YYYY-####), 4 payment methods, auto-recalculates service balance, tabular listing.
+
+### Phase 7 — Finanzas (COMPLETED)
+Revenue, cost, profit, margin %, collected, receivable, services-by-status histogram.
+
+### Phase 8 — Técnicos (COMPLETED)
+CRUD with commission model (percentage/fixed/none) and active flag.
+
+### Phase 9 — Empresas (COMPLETED)
+Corporate accounts with RFC, payment terms, credit limit for fleet consolidation.
+
+### Configuración (COMPLETED)
+Editable company info, tax rate, currency, footer note — feeds the receipt.
+
+### Recibo de venta (COMPLETED)
+Route `/recibo/:kind/:id` (kind = cotizacion | servicio). Renders professional printable receipt on white paper with brand mark + wordmark, folio pill, client/vehicle grid, items table, totals block (subtotal, IVA, TOTAL, pagado, saldo), notes + recommendations, signature lines, footer. `@media print` rules hide chrome. Fully bilingual.
+
+## Backend Endpoints
+Auth: `/api/auth/{login,me,logout}`. Clients, Companies, Vehicles, Technicians, Quotes, Services, Payments — all with POST/GET list/GET one/PATCH/DELETE. Dashboard: `/api/dashboard/summary`. Finance: `/api/finance/summary`. Settings: `/api/settings`.
+
+DB: MongoDB with unique `id` indexes across every collection + folio counters collection.
+
+## Verified End-to-End via curl
+✅ Seed client → seed vehicle → seed technician → create service (auto folio OS-2026-0001, total $2,238.80 with IVA, profit $1,235) → register payment (auto-updates balance) → recibo endpoint returns enriched client + vehicle + technician data → finance summary aggregates correctly → dashboard summary counts clients/vehicles/receivable.
+
+## Next Backlog (P2/P3)
+- Phase 10 · Automatización: WhatsApp recordatorios (Twilio/Emergent), predictive kilometraje alerts, campaigns, AI insights.
+- Evidence photos on service (fal.ai or object storage).
+- PDF export of the receipt using server-side rendering (currently uses browser print).
+- RFC-grouped fleet consolidation view.
+- Splash screen with hex animation.
 
 ## Credentials
-See `/app/memory/test_credentials.md`.
+See `/app/memory/test_credentials.md` — `admin` / `armenta123`.

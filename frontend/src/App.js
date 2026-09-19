@@ -1,5 +1,6 @@
 import React from "react";
 import "@/App.css";
+import "@/receipt.css";
 import {
   BrowserRouter,
   Routes,
@@ -15,7 +16,16 @@ import { AppShell } from "@/components/AppShell";
 
 import Login from "@/pages/Login";
 import Dashboard from "@/pages/Dashboard";
-import ModulePlaceholder from "@/pages/ModulePlaceholder";
+import Clientes from "@/pages/Clientes";
+import Vehiculos from "@/pages/Vehiculos";
+import Servicios from "@/pages/Servicios";
+import Cotizaciones from "@/pages/Cotizaciones";
+import Cobros from "@/pages/Cobros";
+import Finanzas from "@/pages/Finanzas";
+import Tecnicos from "@/pages/Tecnicos";
+import Empresas from "@/pages/Empresas";
+import Configuracion from "@/pages/Configuracion";
+import Recibo from "@/pages/Recibo";
 
 function ProtectedShell({ children }) {
   return (
@@ -25,16 +35,18 @@ function ProtectedShell({ children }) {
   );
 }
 
-const FUTURE_MODULES = [
-  "clientes",
-  "vehiculos",
-  "servicios",
-  "cotizaciones",
-  "cobros",
-  "finanzas",
-  "tecnicos",
-  "empresas",
-  "configuracion",
+const ROUTES = [
+  { path: "/control", el: <Dashboard /> },
+  { path: "/clientes", el: <Clientes /> },
+  { path: "/vehiculos", el: <Vehiculos /> },
+  { path: "/servicios", el: <Servicios /> },
+  { path: "/cotizaciones", el: <Cotizaciones /> },
+  { path: "/cobros", el: <Cobros /> },
+  { path: "/finanzas", el: <Finanzas /> },
+  { path: "/tecnicos", el: <Tecnicos /> },
+  { path: "/empresas", el: <Empresas /> },
+  { path: "/configuracion", el: <Configuracion /> },
+  { path: "/recibo/:kind/:id", el: <Recibo /> },
 ];
 
 export default function App() {
@@ -45,24 +57,8 @@ export default function App() {
           <BrowserRouter>
             <Routes>
               <Route path="/login" element={<Login />} />
-              <Route
-                path="/control"
-                element={
-                  <ProtectedShell>
-                    <Dashboard />
-                  </ProtectedShell>
-                }
-              />
-              {FUTURE_MODULES.map((m) => (
-                <Route
-                  key={m}
-                  path={`/${m}`}
-                  element={
-                    <ProtectedShell>
-                      <ModulePlaceholderRoute moduleKey={m} />
-                    </ProtectedShell>
-                  }
-                />
+              {ROUTES.map((r) => (
+                <Route key={r.path} path={r.path} element={<ProtectedShell>{r.el}</ProtectedShell>} />
               ))}
               <Route path="/" element={<Navigate to="/control" replace />} />
               <Route path="*" element={<Navigate to="/control" replace />} />
@@ -83,9 +79,4 @@ export default function App() {
       </I18nProvider>
     </div>
   );
-}
-
-// tiny wrapper so useParams is not needed here
-function ModulePlaceholderRoute({ moduleKey }) {
-  return <ModulePlaceholder key={moduleKey} moduleKeyOverride={moduleKey} />;
 }

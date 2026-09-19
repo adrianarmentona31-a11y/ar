@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="hex-body" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0%" stop-color="#1a1a1a"/>
+      <stop offset="55%" stop-color="#0d0d0d"/>
+      <stop offset="100%" stop-color="#050505"/>
+    </linearGradient>
+    <linearGradient id="a-fill" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#f4f4f5"/>
+      <stop offset="50%" stop-color="#d4d4d8"/>
+      <stop offset="100%" stop-color="#a1a1aa"/>
+    </linearGradient>
+  </defs>
+  <polygon points="50,3 92,26 92,74 50,97 8,74 8,26" fill="#dc2626"/>
+  <polygon points="50,10 86,29 86,71 50,90 14,71 14,29" fill="url(#hex-body)"/>
+  <path d="M50 25 L74 74 L64 74 L58 62 L42 62 L36 74 L26 74 Z M46 54 L54 54 L50 42 Z" fill="url(#a-fill)"/>
+  <path d="M46 54 L54 54 L50 42 Z" fill="#dc2626"/>
+</svg>
