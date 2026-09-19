@@ -1,0 +1,190 @@
+// Central i18n dictionary — ES (default) & EN.
+// Keep keys stable across phases; add new namespaces per phase.
+
+export const translations = {
+  es: {
+    brand: {
+      company: "ARMENTA'S MOTORS",
+      product: "ARMENTA OS",
+      tagline: "Sistema Operativo de Servicios Automotrices",
+    },
+    login: {
+      title: "Acceso Operativo",
+      subtitle: "Ingresa tus credenciales para entrar al centro de control",
+      username: "Usuario o correo",
+      username_placeholder: "admin",
+      password: "Contraseña",
+      password_placeholder: "••••••••",
+      submit: "Entrar",
+      submitting: "Verificando credenciales…",
+      show: "Mostrar",
+      hide: "Ocultar",
+      errors: {
+        empty: "Ingresa usuario y contraseña.",
+        invalid: "Usuario o contraseña incorrectos.",
+        storage: "No fue posible recuperar la sesión.",
+        network: "No se pudo conectar con el servidor.",
+      },
+      footer: "Uso restringido a personal autorizado de ARMENTA'S MOTORS.",
+    },
+    header: {
+      session_active: "SESIÓN ACTIVA",
+      logout: "Cerrar sesión",
+      role: {
+        admin: "Administrador",
+        manager: "Gerencia",
+        technician: "Técnico de campo",
+        assistant: "Asistente",
+        viewer: "Solo lectura",
+      },
+    },
+    dashboard: {
+      title: "Control",
+      subtitle: "Control operativo de campo",
+      welcome: (name) => `Bienvenido, ${name}`,
+      welcome_generic: "Bienvenido a ARMENTA OS",
+      kpi: {
+        services_today: "Servicios hoy",
+        services_today_sub: "Programados para hoy",
+        quotes: "Cotizaciones",
+        quotes_sub: "Pendientes de aprobación",
+        receivable: "Por cobrar",
+        receivable_sub: "Saldo pendiente",
+        status: "Estado",
+        status_value: "OPERATIVO",
+        status_sub: "Red de servicio móvil activa",
+      },
+      quick_actions: {
+        title: "Acciones rápidas",
+        new_service: "Iniciar nuevo servicio",
+        new_vehicle: "Registrar vehículo",
+        new_quote: "Crear cotización",
+        soon: "Próximamente",
+      },
+      activity: {
+        title: "Actividad reciente",
+        empty:
+          "Aún no hay actividad registrada. Se irá poblando conforme se registren clientes, vehículos y servicios.",
+      },
+    },
+    nav: {
+      control: "Control",
+      clientes: "Clientes",
+      vehiculos: "Vehículos",
+      servicios: "Servicios",
+      cotizaciones: "Cotizaciones",
+      cobros: "Cobros",
+      finanzas: "Finanzas",
+      tecnicos: "Técnicos",
+      empresas: "Empresas",
+      configuracion: "Configuración",
+    },
+    placeholder: {
+      title: (m) => `Módulo ${m}`,
+      badge: "Próximamente",
+      description:
+        "Este módulo forma parte de una fase posterior de ARMENTA OS. La arquitectura ya está preparada para integrarlo sin reconstruir el sistema.",
+      back: "Volver a Control",
+    },
+    toast: {
+      login_ok: "Sesión iniciada.",
+      logout_ok: "Sesión cerrada.",
+      soon: "Módulo pendiente — próxima fase.",
+      lang_switched: "Idioma actualizado.",
+    },
+  },
+  en: {
+    brand: {
+      company: "ARMENTA'S MOTORS",
+      product: "ARMENTA OS",
+      tagline: "Automotive Service Operating System",
+    },
+    login: {
+      title: "Operator Sign-In",
+      subtitle: "Enter your credentials to access the control center",
+      username: "Username or email",
+      username_placeholder: "admin",
+      password: "Password",
+      password_placeholder: "••••••••",
+      submit: "Sign In",
+      submitting: "Verifying credentials…",
+      show: "Show",
+      hide: "Hide",
+      errors: {
+        empty: "Enter username and password.",
+        invalid: "Incorrect username or password.",
+        storage: "Unable to recover session.",
+        network: "Unable to reach the server.",
+      },
+      footer: "Restricted to authorized ARMENTA'S MOTORS personnel.",
+    },
+    header: {
+      session_active: "SESSION ACTIVE",
+      logout: "Sign out",
+      role: {
+        admin: "Administrator",
+        manager: "Manager",
+        technician: "Field Technician",
+        assistant: "Assistant",
+        viewer: "Viewer",
+      },
+    },
+    dashboard: {
+      title: "Control",
+      subtitle: "Field operations control panel",
+      welcome: (name) => `Welcome, ${name}`,
+      welcome_generic: "Welcome to ARMENTA OS",
+      kpi: {
+        services_today: "Services today",
+        services_today_sub: "Scheduled for today",
+        quotes: "Quotations",
+        quotes_sub: "Pending approval",
+        receivable: "Receivables",
+        receivable_sub: "Outstanding balance",
+        status: "Status",
+        status_value: "OPERATIONAL",
+        status_sub: "Mobile service network live",
+      },
+      quick_actions: {
+        title: "Quick actions",
+        new_service: "Start new service",
+        new_vehicle: "Register vehicle",
+        new_quote: "Create quotation",
+        soon: "Coming soon",
+      },
+      activity: {
+        title: "Recent activity",
+        empty:
+          "No activity yet. It will populate as clients, vehicles and services are registered.",
+      },
+    },
+    nav: {
+      control: "Control",
+      clientes: "Clients",
+      vehiculos: "Vehicles",
+      servicios: "Services",
+      cotizaciones: "Quotes",
+      cobros: "Payments",
+      finanzas: "Finance",
+      tecnicos: "Technicians",
+      empresas: "Companies",
+      configuracion: "Settings",
+    },
+    placeholder: {
+      title: (m) => `${m} module`,
+      badge: "Coming soon",
+      description:
+        "This module belongs to a later phase of ARMENTA OS. The architecture is already prepared to plug it in without rebuilding the system.",
+      back: "Back to Control",
+    },
+    toast: {
+      login_ok: "Session started.",
+      logout_ok: "Session ended.",
+      soon: "Module pending — next phase.",
+      lang_switched: "Language updated.",
+    },
+  },
+};
+
+export const DEFAULT_LOCALE = "es";
+export const SUPPORTED_LOCALES = ["es", "en"];

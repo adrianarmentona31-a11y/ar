@@ -1,0 +1,211 @@
+{
+  "project_name": "ARMENTA OS - Sistema Operativo Empresarial",
+  "app_type": "Mobile-First Field Service Operational SaaS Dashboard",
+  "target_audience": "Field mechanics, mobile automotive technicians, automotive service managers & administrators in Mexico",
+  "design_philosophy": "Industrial Luxury & High-Tactile Tactical Precision. Dark obsidian & metallic champagne gold palette engineered for heavy field usage, outdoor sunlight legibility, and effortless one-handed smartphone control.",
+  "language_support": {
+    "default": "es",
+    "supported": ["es", "en"],
+    "toggle_locations": ["Header Top Right", "Login Screen Header"]
+  },
+  "colors": {
+    "bg_root": "#070707",
+    "bg_card": "#101010",
+    "bg_card_hover": "#161616",
+    "bg_elevated": "#1A1A1A",
+    "border_subtle": "#262626",
+    "border_accent": "#C9A45C33",
+    "accent_gold": "#C9A45C",
+    "accent_gold_hover": "#D9B46A",
+    "accent_gold_subtle": "rgba(201, 164, 92, 0.12)",
+    "text_primary": "#FFFFFF",
+    "text_secondary": "#A1A1AA",
+    "text_muted": "#71717A",
+    "status_active": "#22C55E",
+    "status_active_bg": "#052E16",
+    "status_warning": "#F59E0B",
+    "status_error": "#EF4444",
+    "status_error_bg": "#451A1A",
+    "overlay_glass": "rgba(16, 16, 16, 0.85)"
+  },
+  "typography": {
+    "headings_font": "Barlow Condensed, Outfit, sans-serif",
+    "body_font": "Inter, system-ui, sans-serif",
+    "mono_font": "JetBrains Mono, monospace",
+    "scale": {
+      "h1_hero": "text-3xl sm:text-4xl lg:text-5xl font-extrabold uppercase tracking-tight",
+      "h2_section": "text-xl sm:text-2xl lg:text-3xl font-bold uppercase tracking-wide",
+      "h3_card": "text-lg sm:text-xl font-semibold tracking-normal",
+      "kpi_value": "text-3xl sm:text-4xl font-extrabold text-white font-mono",
+      "body_lg": "text-base leading-relaxed",
+      "body_md": "text-sm leading-normal",
+      "caption": "text-xs uppercase tracking-widest text-zinc-400 font-mono"
+    }
+  },
+  "responsive": {
+    "breakpoint": "Mobile-first baseline (375px - 430px) scaling to Desktop (1024px+)",
+    "layout": {
+      "mobile": "Single column vertical stack, bottom persistent tactical navigation bar with large 48px touch targets, sticky compact header with session badge and ES/EN toggle.",
+      "desktop": "Collapsible left sidebar with golden industrial accents + fixed top header + multi-column grid for KPIs and module widgets."
+    },
+    "tap_targets": "Minimum touch height 48px to 56px for inputs and main CTAs to allow effortless single-handed operation with or without work gloves.",
+    "overflow_guard": "Strict overflow-x-hidden on root containers, horizontal scrolling tables wrapped in responsive containers with touch momentum."
+  },
+  "layouts": {
+    "login_screen": {
+      "structure": "Full-height obsidian container (`bg-[#070707]`) with subtle dark geometric mesh overlay, centered responsive card (`max-w-md w-full p-6 sm:p-8 bg-[#101010] border border-[#262626] rounded-2xl shadow-2xl`).",
+      "branding": "Metallic gold emblem/logo badge, 'ARMENTA'S MOTORS' wordmark, 'ARMENTA OS' subtitle with glowing operational status indicator.",
+      "form_elements": [
+        "Language switch (ES / EN) floating top-right",
+        "Usuario field (Icon + Input, text-base, h-12)",
+        "Contraseña field (Icon + Input + Show/Hide toggle, h-12)",
+        "ENTRAR button (h-14, solid #C9A45C text-black font-bold text-lg hover:bg-[#D9B46A] shadow-[0_0_20px_rgba(201,164,92,0.25)])",
+        "Loading indicator state with metallic spinner and 'Verificando credenciales...' text",
+        "Error feedback toast/alert box in crisp dark red (`#451A1A`) with border `#EF4444`",
+        "Quick credentials demo helper button for instant field testing"
+      ]
+    },
+    "dashboard_control": {
+      "header": {
+        "title": "ARMENTA OS",
+        "subtitle": "CONTROL OPERATIVO DE CAMPO",
+        "elements": [
+          "Technician Avatar & Badge ('Técnico de Campo' / 'Administrador')",
+          "Session Badge: '● SESIÓN ACTIVA' with pulse effect in emerald green",
+          "ES / EN Language Toggle",
+          "Logout button ('Cerrar Sesión' / 'Log Out') with confirmation modal"
+        ]
+      },
+      "kpi_grid": {
+        "columns": "grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4",
+        "cards": [
+          {
+            "id": "servicios-hoy",
+            "title_es": "Servicios Hoy",
+            "title_en": "Services Today",
+            "value": "0",
+            "subtitle_es": "Programados para hoy",
+            "subtitle_en": "Scheduled today",
+            "badge": "HOY",
+            "icon": "Wrench"
+          },
+          {
+            "id": "cotizaciones",
+            "title_es": "Cotizaciones",
+            "title_en": "Quotations",
+            "value": "0",
+            "subtitle_es": "Pendientes de aprobación",
+            "subtitle_en": "Pending approval",
+            "badge": "PENDIENTE",
+            "icon": "FileText"
+          },
+          {
+            "id": "por-cobrar",
+            "title_es": "Por Cobrar",
+            "title_en": "Pending Collection",
+            "value": "$0 MXN",
+            "subtitle_es": "Saldo pendiente",
+            "subtitle_en": "Outstanding balance",
+            "badge": "FINANZAS",
+            "icon": "DollarSign"
+          },
+          {
+            "id": "estado-sistema",
+            "title_es": "Estado Sistema",
+            "title_en": "System Status",
+            "value": "OPERATIVO",
+            "subtitle_es": "Red de servicio móvil activa",
+            "subtitle_en": "Mobile service active",
+            "badge": "ONLINE",
+            "icon": "ShieldCheck"
+          }
+        ]
+      },
+      "quick_actions_and_status": {
+        "layout": "grid-cols-1 lg:grid-cols-3 gap-4 mt-6",
+        "action_panel": "Field Operations Quick Bar: 'Iniciar Nuevo Servicio', 'Registrar Vehículo', 'Crear Cotización' (each opening future phase modal or triggering 'Próximamente' feedback)",
+        "recent_activity": "Tactical timeline preview showing real-time mobile unit dispatch readiness in Mexico."
+      }
+    },
+    "future_modules_placeholder": {
+      "display": "Clean high-end industrial placeholder layout when navigating to non-CONTROL tabs.",
+      "elements": [
+        "Module Title (CLIENTES, VEHÍCULOS, SERVICIOS, COTIZACIONES, COBROS, FINANZAS, TÉCNICOS, EMPRESAS, CONFIGURACIÓN)",
+        "Status Badge: 'FASE 2 - PRÓXIMAMENTE' / 'PHASE 2 - COMING SOON'",
+        "Detailed preview card of upcoming capabilities (e.g. for VEHÍCULOS: VIN Scanner, Historial de Mantenimiento, Registro de Placas México)",
+        "Button: 'Volver a Control' / 'Back to Control Panel'"
+      ]
+    }
+  },
+  "visual_enhancers": {
+    "borders": "1px solid #262626 on dark surfaces, with gold accent stroke (`#C9A45C33`) on focused or active cards.",
+    "shadows": "Subtle ambient black shadow (`shadow-xl`) + localized gold glow for high-priority CTA actions (`drop-shadow-[0_0_12px_rgba(201,164,92,0.2)]`).",
+    "textures": "Carbon fiber inspired micro-dot pattern or clean matte obsidian finish.",
+    "one_handed_mode": "Key interactive controls placed within thumb reach zone on mobile screens."
+  },
+  "data_testids": {
+    "auth": {
+      "login_form": "login-form",
+      "username_input": "login-username-input",
+      "password_input": "login-password-input",
+      "submit_button": "login-submit-button",
+      "error_alert": "login-error-alert",
+      "loading_spinner": "login-loading-spinner",
+      "lang_toggle": "login-language-toggle",
+      "demo_fill_btn": "login-demo-credentials-button"
+    },
+    "header": {
+      "user_badge": "header-user-badge",
+      "session_indicator": "header-session-active-indicator",
+      "lang_toggle": "header-language-toggle",
+      "logout_button": "header-logout-button"
+    },
+    "navigation": {
+      "sidebar": "desktop-sidebar-nav",
+      "bottom_nav": "mobile-bottom-nav",
+      "nav_control": "nav-item-control",
+      "nav_clientes": "nav-item-clientes",
+      "nav_vehiculos": "nav-item-vehiculos",
+      "nav_servicios": "nav-item-servicios",
+      "nav_cotizaciones": "nav-item-cotizaciones",
+      "nav_cobros": "nav-item-cobros",
+      "nav_finanzas": "nav-item-finanzas",
+      "nav_tecnicos": "nav-item-tecnicos",
+      "nav_empresas": "nav-item-empresas",
+      "nav_configuracion": "nav-item-configuracion"
+    },
+    "dashboard": {
+      "kpi_servicios": "kpi-card-servicios-hoy",
+      "kpi_cotizaciones": "kpi-card-cotizaciones",
+      "kpi_por_cobrar": "kpi-card-por-cobrar",
+      "kpi_estado": "kpi-card-estado-sistema",
+      "quick_action_servicio": "action-btn-nuevo-servicio",
+      "quick_action_cotizacion": "action-btn-nueva-cotizacion",
+      "proximamente_banner": "module-proximamente-banner"
+    }
+  },
+  "image_urls": {
+    "garage_workshop": "https://images.unsplash.com/photo-1786489623043-fb024ae22e82?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxOTJ8MHwxfHNlYXJjaHwzfHxsdXh1cnklMjBibGFjayUyMHNwb3J0cyUyMGNhciUyMG1lY2hhbmljcyUyMGdhcmFnZSUyMGluZHVzdHJpYWwlMjBhdXRvbW90aXZlJTIwd29ya3Nob3B8ZW58MHx8fHwxNzg5NzkxNzUyfDA&ixlib=rb-4.1.0&q=85",
+    "sports_car_garage": "https://images.pexels.com/photos/6969027/pexels-photo-6969027.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940"
+  },
+  "instructions_to_main_agent": [
+    "Ensure all code files are .js or .jsx format (not .tsx).",
+    "Build a robust authentication state management system (React Context or state hook with localStorage persistence) holding current user info, session active state, and current locale ('es' or 'en').",
+    "Implement the Login Screen with real-time field validation, error state simulation (e.g., incorrect password feedback), loading state on submit, and a handy 'Cargar Demo' button to prefill 'admin' / 'armenta2026' or 'tecnico' / 'campo2026'.",
+    "Implement the CONTROL Dashboard with full bilingual support (Spanish/English translations for all labels, cards, badges, and tooltips).",
+    "Render the 4 mandatory KPI Cards: Servicios Hoy (0), Cotizaciones (0), Por Cobrar ($0), and Estado (OPERATIVO).",
+    "Build full responsive navigation with a Mobile Bottom Bar for smartphones and a Collapsible Sidebar for tablets/desktop.",
+    "Provide clear 'Próximamente' / 'Coming Soon' placeholder pages with feature previews when clicking non-Control navigation tabs (Clientes, Vehículos, Servicios, Cotizaciones, Cobros, Finanzas, Técnicos, Empresas, Configuración).",
+    "Apply strict `data-testid` attributes to all form inputs, buttons, badges, KPI cards, navigation items, and header actions as specified in `data_testids`.",
+    "Use Lucide-React icons (`lucide-react`) for clean industrial UI iconography (Wrench, ShieldCheck, DollarSign, FileText, Car, Users, Settings, LogOut, Globe, CheckCircle).",
+    "Use `sonner` for toast notifications when performing actions like toggling language, logging out, or clicking quick action buttons."
+  ],
+  "UNIVERSAL GUIDELINES FOR MAIN AGENT": [
+    "Dark obsidian colors look best when used clean without bright colorful rainbow gradients.",
+    "Do not use generic centered layouts or unstyled default HTML inputs.",
+    "Ensure input fields have high contrast text (#FFFFFF) and explicit hover/focus states with gold borders (#C9A45C).",
+    "Never rely on transparent dropdowns or header backgrounds that make content illegible when scrolling.",
+    "Always set high-contrast text explicitly on hover states: e.g. `hover:bg-[#18181B] hover:text-white`.",
+    "Touch targets on mobile must be at least 48px height with generous padding for gloved or single-handed field usage."
+  ]
+}
